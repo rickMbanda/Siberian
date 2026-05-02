@@ -129,6 +129,11 @@ const ExamNavigation = () => {
                   Reports
                 </button>
               </Link>
+              <Link to="/analytics" style={{ textDecoration: 'none' }}>
+                <button className={`nav-button ${location.pathname === '/analytics' ? 'active' : ''}`}>
+                  Analytics
+                </button>
+              </Link>
               <Link to="/students" style={{ textDecoration: 'none' }}>
                 <button className={`nav-button ${location.pathname === '/students' ? 'active' : ''}`}>
                   Students

@@ -1,0 +1,721 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar, Line } from 'react-chartjs-2';
+import ExamNavigation from '../Components/ExamNavigation';
+import { fetchResults } from '../api/results';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend);
+
+const CLASSES = [
+  'Playgroup', 'PP1', 'PP2', 'Grade 1', 'Grade 2', 'Grade 3',
+  'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9',
+];
+
+const SUBJECTS = {
+  maths: 'Maths',
+  english: 'English',
+  kiswahili: 'Kiswahili',
+  language: 'Language',
+  reading: 'Reading',
+  environmental: 'Environmental',
+  integrated: 'Integrated',
+  creative: 'Creative',
+  cre: 'CRE',
+  kusoma: 'Kusoma',
+  social: 'Social',
+  pretech: 'Pre-Tech',
+  agriculture: 'Agriculture',
+};
+
+const TERMS = ['Term 1', 'Term 2', 'Term 3'];
+const EXAM_TYPES = ['opener', 'midterm', 'endterm'];
+const EXAM_LABELS = { opener: 'Opener', midterm: 'Midterm', endterm: 'Endterm' };
+
+const TABS = [
+  { label: 'Class Comparison',   icon: '📊' },
+  { label: 'Subject Heat Map',   icon: '🌡️' },
+  { label: 'Class Progression',  icon: '📈' },
+  { label: 'Student Progress',   icon: '👤' },
+  { label: 'At-Risk Students',   icon: '⚠️' },
+  { label: 'Subject Weakness',   icon: '🔍' },
+];
+
+const avg = (arr) => (arr.length === 0 ? null : arr.reduce((a, b) => a + b, 0) / arr.length);
+
+const scoreColor = (score) => {
+  if (score === null || score === undefined || isNaN(score))
+    return { bg: '#f3f4f6', text: '#9ca3af' };
+  if (score >= 80) return { bg: '#dcfce7', text: '#15803d' };
+  if (score >= 60) return { bg: '#d9f99d', text: '#4d7c0f' };
+  if (score >= 40) return { bg: '#fef3c7', text: '#92400e' };
+  return { bg: '#fee2e2', text: '#991b1b' };
+};
+
+const bandLabel = (score) => {
+  if (score === null || isNaN(score)) return '—';
+  if (score >= 80) return 'Exceeds Expectations';
+  if (score >= 60) return 'Meets Expectations';
+  if (score >= 40) return 'Approaching Expectations';
+  return 'Below Expectations';
+};
+
+const S = {
+  page: {
+    background: 'linear-gradient(135deg, #7ec8ff 0%, #56b0e2 100%)',
+    minHeight: '100vh',
+    fontFamily: '"Inter", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif',
+  },
+  wrapper: { maxWidth: '1340px', margin: '0 auto', padding: '20px' },
+  card: {
+    background: 'rgba(255,255,255,0.97)',
+    borderRadius: '20px',
+    padding: '28px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+    marginBottom: '20px',
+  },
+  pageTitle: { fontSize: '2rem', fontWeight: '700', color: '#0b3d91', margin: '0 0 4px 0' },
+  pageSub: { color: '#6b7280', margin: '0 0 24px 0', fontSize: '0.95rem' },
+  filterRow: { display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end' },
+  filterGroup: { display: 'flex', flexDirection: 'column', gap: '4px' },
+  filterLabel: {
+    fontSize: '0.72rem', fontWeight: '700', color: '#6b7280',
+    textTransform: 'uppercase', letterSpacing: '0.6px',
+  },
+  select: {
+    padding: '8px 14px', borderRadius: '8px', border: '1.5px solid #e5e7eb',
+    fontSize: '0.9rem', color: '#374151', background: '#fff', cursor: 'pointer',
+    minWidth: '140px', outline: 'none',
+  },
+  tabRow: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' },
+  sectionTitle: { fontSize: '1.1rem', fontWeight: '700', color: '#1f2937', marginBottom: '16px' },
+  table: { width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' },
+  th: {
+    padding: '10px 14px', background: '#0b3d91', color: '#fff',
+    fontWeight: '600', textAlign: 'left', fontSize: '0.8rem',
+  },
+  td: { padding: '8px 14px', borderBottom: '1px solid #f3f4f6' },
+  statCard: {
+    background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+    borderRadius: '12px', padding: '16px 20px', textAlign: 'center',
+  },
+  statValue: { fontSize: '1.75rem', fontWeight: '700', color: '#0b3d91' },
+  statLabel: { fontSize: '0.78rem', color: '#6b7280', fontWeight: '500', marginTop: '4px' },
+  empty: { textAlign: 'center', padding: '60px 20px', color: '#9ca3af', fontSize: '0.95rem' },
+};
+
+const tabStyle = (active) => ({
+  padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+  fontWeight: '600', fontSize: '0.85rem',
+  background: active ? '#0b3d91' : '#f1f5f9',
+  color: active ? '#fff' : '#374151',
+  transition: 'all 0.2s', whiteSpace: 'nowrap',
+});
+
+const baseChartOptions = {
+  responsive: true,
+  plugins: {
+    legend: { display: false },
+    tooltip: { callbacks: { label: (ctx) => ` ${ctx.parsed.y?.toFixed(1) ?? 'N/A'}` } },
+  },
+  scales: { y: { min: 0, max: 100, ticks: { stepSize: 20 } } },
+};
+
+const Analytics = () => {
+  const currentYear = new Date().getFullYear().toString();
+  const years = [];
+  for (let y = parseInt(currentYear) - 2; y <= parseInt(currentYear) + 2; y++)
+    years.push(y.toString());
+
+  const [selectedYear, setSelectedYear]         = useState(currentYear);
+  const [selectedTerm, setSelectedTerm]         = useState('Term 1');
+  const [selectedExamType, setSelectedExamType] = useState('endterm');
+  const [activeTab, setActiveTab]               = useState(0);
+  const [allResults, setAllResults]             = useState([]);
+  const [loading, setLoading]                   = useState(true);
+
+  const [progClass, setProgClass]       = useState('Grade 1');
+  const [selectedStudent, setSelectedStudent] = useState('');
+  const [atRiskThreshold, setAtRiskThreshold] = useState(40);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await fetchResults(selectedYear);
+        if (!cancelled) setAllResults(Array.isArray(data) ? data : []);
+      } catch (e) {
+        if (!cancelled) setAllResults([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [selectedYear]);
+
+  const filteredResults = useMemo(() =>
+    allResults.filter(
+      (r) => r.term === selectedTerm && r.examType === selectedExamType && r.examStatus !== 'absent'
+    ),
+    [allResults, selectedTerm, selectedExamType]
+  );
+
+  /* ── Tab 0: Class Comparison ─────────────────────────────────── */
+  const classComparison = useMemo(() => {
+    const byClass = {};
+    filteredResults.forEach((r) => {
+      if (typeof r.mean !== 'number') return;
+      (byClass[r.class] = byClass[r.class] || []).push(r.mean);
+    });
+    const means = CLASSES.map((cls) => (byClass[cls] ? avg(byClass[cls]) : null));
+    return { labels: CLASSES, means };
+  }, [filteredResults]);
+
+  /* ── Tab 1: Subject Heat Map ─────────────────────────────────── */
+  const heatMap = useMemo(() => {
+    const byClass = {};
+    filteredResults.forEach((r) => {
+      Object.keys(SUBJECTS).forEach((subj) => {
+        if (typeof r[subj] !== 'number') return;
+        if (!byClass[r.class]) byClass[r.class] = {};
+        (byClass[r.class][subj] = byClass[r.class][subj] || []).push(r[subj]);
+      });
+    });
+    const activeSubjects = Object.keys(SUBJECTS).filter((subj) =>
+      CLASSES.some((cls) => byClass[cls]?.[subj]?.length > 0)
+    );
+    return { byClass, activeSubjects };
+  }, [filteredResults]);
+
+  /* ── Tab 2: Class Progression ────────────────────────────────── */
+  const classProgression = useMemo(() => {
+    const rows = allResults.filter((r) => r.class === progClass && r.examStatus !== 'absent');
+    const labels = [];
+    const values = [];
+    TERMS.forEach((term) => {
+      EXAM_TYPES.forEach((et) => {
+        const slice = rows.filter((r) => r.term === term && r.examType === et && typeof r.mean === 'number');
+        labels.push(`${term.replace('Term ', 'T')} ${EXAM_LABELS[et]}`);
+        values.push(slice.length ? avg(slice.map((r) => r.mean)) : null);
+      });
+    });
+    return { labels, values };
+  }, [allResults, progClass]);
+
+  /* ── Tab 3: Student Progress ─────────────────────────────────── */
+  const uniqueStudents = useMemo(() => {
+    const seen = new Set();
+    return allResults
+      .filter((r) => {
+        const key = r.studentRecordId || r.name;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((r) => ({ id: r.studentRecordId || r.name, name: r.name, cls: r.class }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allResults]);
+
+  const studentProgress = useMemo(() => {
+    if (!selectedStudent) return null;
+    const rows = allResults.filter(
+      (r) => (r.studentRecordId || r.name) === selectedStudent
+    );
+    const labels = [];
+    const values = [];
+    TERMS.forEach((term) => {
+      EXAM_TYPES.forEach((et) => {
+        const row = rows.find((r) => r.term === term && r.examType === et);
+        labels.push(`${term.replace('Term ', 'T')} ${EXAM_LABELS[et]}`);
+        values.push(row && typeof row.mean === 'number' ? row.mean : null);
+      });
+    });
+    const studentName = uniqueStudents.find((s) => s.id === selectedStudent)?.name || '';
+    return { labels, values, name: studentName };
+  }, [allResults, selectedStudent, uniqueStudents]);
+
+  /* ── Tab 4: At-Risk Students ─────────────────────────────────── */
+  const atRiskList = useMemo(() =>
+    filteredResults
+      .filter((r) => typeof r.mean === 'number' && r.mean < atRiskThreshold)
+      .sort((a, b) => a.mean - b.mean)
+      .map((r) => ({ name: r.name, cls: r.class, mean: r.mean, rubric: r.rubric })),
+    [filteredResults, atRiskThreshold]
+  );
+
+  /* ── Tab 5: Subject Weakness ─────────────────────────────────── */
+  const subjectWeakness = useMemo(() => {
+    return Object.keys(SUBJECTS)
+      .map((subj) => {
+        const scores = filteredResults
+          .map((r) => r[subj])
+          .filter((v) => typeof v === 'number' && !isNaN(v));
+        return { subj, label: SUBJECTS[subj], avg: scores.length ? avg(scores) : null, count: scores.length };
+      })
+      .filter((s) => s.avg !== null && s.count > 0)
+      .sort((a, b) => a.avg - b.avg);
+  }, [filteredResults]);
+
+  /* ── Summary stats for Class Comparison ─────────────────────── */
+  const compStats = useMemo(() => {
+    const valid = classComparison.means
+      .map((m, i) => ({ mean: m, cls: CLASSES[i] }))
+      .filter((x) => x.mean !== null);
+    if (!valid.length) return null;
+    const school = avg(valid.map((x) => x.mean));
+    const top    = valid.reduce((a, b) => (a.mean > b.mean ? a : b));
+    const bot    = valid.reduce((a, b) => (a.mean < b.mean ? a : b));
+    return { school, top: top.cls, bottom: bot.cls, count: valid.length };
+  }, [classComparison]);
+
+  return (
+    <div style={S.page}>
+      <ExamNavigation />
+      <div style={S.wrapper}>
+
+        {/* ── Header + Global Filters ── */}
+        <div style={S.card}>
+          <h1 style={S.pageTitle}>Analytics &amp; Insights</h1>
+          <p style={S.pageSub}>School-wide performance analytics — Spring Valley Baptist School</p>
+          <div style={S.filterRow}>
+            <div style={S.filterGroup}>
+              <span style={S.filterLabel}>Academic Year</span>
+              <select style={S.select} value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
+                {years.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <div style={S.filterGroup}>
+              <span style={S.filterLabel}>Term</span>
+              <select style={S.select} value={selectedTerm} onChange={(e) => setSelectedTerm(e.target.value)}>
+                {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div style={S.filterGroup}>
+              <span style={S.filterLabel}>Exam Type</span>
+              <select style={S.select} value={selectedExamType} onChange={(e) => setSelectedExamType(e.target.value)}>
+                {EXAM_TYPES.map((et) => <option key={et} value={et}>{EXAM_LABELS[et]}</option>)}
+              </select>
+            </div>
+            {loading && (
+              <span style={{ color: '#6b7280', fontSize: '0.85rem', paddingBottom: '2px' }}>
+                Loading data…
+              </span>
+            )}
+            {!loading && (
+              <span style={{ color: '#22c55e', fontSize: '0.85rem', fontWeight: '600', paddingBottom: '2px' }}>
+                {allResults.length} records loaded
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ── Tabs + Content ── */}
+        <div style={S.card}>
+          <div style={S.tabRow}>
+            {TABS.map((tab, i) => (
+              <button key={i} style={tabStyle(activeTab === i)} onClick={() => setActiveTab(i)}>
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ══ Tab 0: Class Comparison ══ */}
+          {activeTab === 0 && (
+            <div>
+              <p style={S.sectionTitle}>
+                Class Mean Scores — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+              </p>
+
+              {compStats ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px', marginBottom: '28px' }}>
+                    {[
+                      { label: 'School Average',    value: compStats.school.toFixed(1) },
+                      { label: 'Top Performing',    value: compStats.top },
+                      { label: 'Needs Most Support', value: compStats.bottom },
+                      { label: 'Classes with Data', value: compStats.count },
+                    ].map(({ label, value }) => (
+                      <div key={label} style={S.statCard}>
+                        <div style={S.statValue}>{value}</div>
+                        <div style={S.statLabel}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <Bar
+                    data={{
+                      labels: classComparison.labels,
+                      datasets: [{
+                        label: 'Class Mean',
+                        data: classComparison.means,
+                        backgroundColor: classComparison.means.map((m) =>
+                          m === null ? '#e5e7eb' : m >= 80 ? '#22c55e' : m >= 60 ? '#84cc16' : m >= 40 ? '#f59e0b' : '#ef4444'
+                        ),
+                        borderRadius: 6,
+                      }],
+                    }}
+                    options={{
+                      ...baseChartOptions,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => ` Mean: ${ctx.parsed.y?.toFixed(1) ?? 'N/A'}` } },
+                      },
+                    }}
+                  />
+                </>
+              ) : (
+                <div style={S.empty}>No data for the selected filters.</div>
+              )}
+            </div>
+          )}
+
+          {/* ══ Tab 1: Subject Heat Map ══ */}
+          {activeTab === 1 && (
+            <div>
+              <p style={S.sectionTitle}>
+                Subject Performance Heat Map — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+              </p>
+              {heatMap.activeSubjects.length === 0 ? (
+                <div style={S.empty}>No subject data for the selected filters.</div>
+              ) : (
+                <>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={S.table}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...S.th, minWidth: '100px', position: 'sticky', left: 0, zIndex: 1 }}>Class</th>
+                          {heatMap.activeSubjects.map((s) => (
+                            <th key={s} style={{ ...S.th, textAlign: 'center', minWidth: '80px' }}>
+                              {SUBJECTS[s]}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {CLASSES.map((cls) => {
+                          const cd = heatMap.byClass[cls];
+                          if (!cd) return null;
+                          return (
+                            <tr key={cls}>
+                              <td style={{ ...S.td, fontWeight: '700', color: '#0b3d91', position: 'sticky', left: 0, background: '#fff', zIndex: 1 }}>
+                                {cls}
+                              </td>
+                              {heatMap.activeSubjects.map((subj) => {
+                                const mean = cd[subj] ? avg(cd[subj]) : null;
+                                const { bg, text } = scoreColor(mean);
+                                return (
+                                  <td key={subj} style={{ ...S.td, textAlign: 'center', background: bg, color: text, fontWeight: '700', fontSize: '0.85rem' }}>
+                                    {mean !== null ? mean.toFixed(1) : '—'}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
+                    {[
+                      { bg: '#dcfce7', text: '#15803d', label: '≥ 80  Exceeds Expectations' },
+                      { bg: '#d9f99d', text: '#4d7c0f', label: '60–79  Meets Expectations' },
+                      { bg: '#fef3c7', text: '#92400e', label: '40–59  Approaching Expectations' },
+                      { bg: '#fee2e2', text: '#991b1b', label: '< 40  Below Expectations' },
+                    ].map(({ bg, text, label }) => (
+                      <span key={label} style={{ background: bg, color: text, padding: '4px 12px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '600' }}>
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ══ Tab 2: Class Progression ══ */}
+          {activeTab === 2 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                <p style={{ ...S.sectionTitle, margin: 0 }}>Class Mean Progression Throughout {selectedYear}</p>
+                <div style={S.filterGroup}>
+                  <span style={S.filterLabel}>Class</span>
+                  <select style={S.select} value={progClass} onChange={(e) => setProgClass(e.target.value)}>
+                    {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              {classProgression.values.every((v) => v === null) ? (
+                <div style={S.empty}>No data for {progClass} in {selectedYear}.</div>
+              ) : (
+                <Line
+                  data={{
+                    labels: classProgression.labels,
+                    datasets: [{
+                      label: `${progClass} Mean`,
+                      data: classProgression.values,
+                      borderColor: '#4169E1',
+                      backgroundColor: 'rgba(65,105,225,0.08)',
+                      tension: 0.4,
+                      fill: true,
+                      pointRadius: 5,
+                      pointBackgroundColor: '#4169E1',
+                      spanGaps: true,
+                    }],
+                  }}
+                  options={{
+                    ...baseChartOptions,
+                    plugins: {
+                      legend: { display: true, labels: { font: { size: 13 }, color: '#374151' } },
+                      tooltip: { callbacks: { label: (ctx) => ` Mean: ${ctx.parsed.y?.toFixed(1) ?? 'N/A'}` } },
+                    },
+                  }}
+                />
+              )}
+            </div>
+          )}
+
+          {/* ══ Tab 3: Student Progress ══ */}
+          {activeTab === 3 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                <p style={{ ...S.sectionTitle, margin: 0 }}>Student Performance Throughout {selectedYear}</p>
+                <div style={S.filterGroup}>
+                  <span style={S.filterLabel}>Student</span>
+                  <select
+                    style={{ ...S.select, minWidth: '240px' }}
+                    value={selectedStudent}
+                    onChange={(e) => setSelectedStudent(e.target.value)}
+                  >
+                    <option value="">— Select a student —</option>
+                    {uniqueStudents.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.cls})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {!selectedStudent && (
+                <div style={S.empty}>Select a student above to view their progress chart.</div>
+              )}
+
+              {selectedStudent && studentProgress && (
+                <>
+                  {studentProgress.values.every((v) => v === null) ? (
+                    <div style={S.empty}>No exam data found for this student in {selectedYear}.</div>
+                  ) : (
+                    <>
+                      {/* Mini stats */}
+                      {(() => {
+                        const vals = studentProgress.values.filter((v) => v !== null);
+                        const best  = Math.max(...vals);
+                        const worst = Math.min(...vals);
+                        const mean  = avg(vals);
+                        return (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+                            {[
+                              { label: 'Best Score',    value: best.toFixed(1) },
+                              { label: 'Lowest Score',  value: worst.toFixed(1) },
+                              { label: 'Year Average',  value: mean.toFixed(1) },
+                              { label: 'Exams Recorded', value: vals.length },
+                            ].map(({ label, value }) => (
+                              <div key={label} style={S.statCard}>
+                                <div style={S.statValue}>{value}</div>
+                                <div style={S.statLabel}>{label}</div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                      <Line
+                        data={{
+                          labels: studentProgress.labels,
+                          datasets: [{
+                            label: studentProgress.name,
+                            data: studentProgress.values,
+                            borderColor: '#8b5cf6',
+                            backgroundColor: 'rgba(139,92,246,0.08)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#8b5cf6',
+                            spanGaps: true,
+                          }],
+                        }}
+                        options={{
+                          ...baseChartOptions,
+                          plugins: {
+                            legend: { display: true, labels: { font: { size: 13 }, color: '#374151' } },
+                            tooltip: { callbacks: { label: (ctx) => ` Mean: ${ctx.parsed.y?.toFixed(1) ?? 'N/A'}` } },
+                          },
+                        }}
+                      />
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ══ Tab 4: At-Risk Students ══ */}
+          {activeTab === 4 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                <p style={{ ...S.sectionTitle, margin: 0 }}>
+                  At-Risk Students — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+                </p>
+                <div style={S.filterGroup}>
+                  <span style={S.filterLabel}>Threshold — scoring below</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input
+                      type="range" min="20" max="70" step="5"
+                      value={atRiskThreshold}
+                      onChange={(e) => setAtRiskThreshold(Number(e.target.value))}
+                      style={{ width: '130px', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontWeight: '700', color: '#ef4444', fontSize: '1.1rem', minWidth: '28px' }}>
+                      {atRiskThreshold}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {atRiskList.length === 0 ? (
+                <div style={{ ...S.empty, color: '#22c55e', fontWeight: '600' }}>
+                  No students below {atRiskThreshold} for this selection.
+                </div>
+              ) : (
+                <>
+                  <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '12px' }}>
+                    {atRiskList.length} student{atRiskList.length !== 1 ? 's' : ''} scoring below&nbsp;
+                    <strong style={{ color: '#ef4444' }}>{atRiskThreshold}</strong>
+                  </p>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={S.table}>
+                      <thead>
+                        <tr>
+                          <th style={S.th}>#</th>
+                          <th style={S.th}>Student Name</th>
+                          <th style={S.th}>Class</th>
+                          <th style={{ ...S.th, textAlign: 'center' }}>Mean Score</th>
+                          <th style={S.th}>Performance Band</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {atRiskList.map((s, i) => {
+                          const { bg, text } = scoreColor(s.mean);
+                          return (
+                            <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <td style={{ ...S.td, color: '#9ca3af', fontWeight: '600' }}>{i + 1}</td>
+                              <td style={{ ...S.td, fontWeight: '600' }}>{s.name}</td>
+                              <td style={S.td}>{s.cls}</td>
+                              <td style={{ ...S.td, textAlign: 'center' }}>
+                                <span style={{ background: bg, color: text, padding: '3px 12px', borderRadius: '20px', fontWeight: '700', fontSize: '0.875rem' }}>
+                                  {s.mean.toFixed(1)}
+                                </span>
+                              </td>
+                              <td style={{ ...S.td, color: text, fontWeight: '500', fontSize: '0.85rem' }}>
+                                {bandLabel(s.mean)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ══ Tab 5: Subject Weakness Report ══ */}
+          {activeTab === 5 && (
+            <div>
+              <p style={S.sectionTitle}>
+                Subject Weakness Report — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+              </p>
+              <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '20px' }}>
+                Subjects ranked weakest to strongest across the whole school. Top 3 in red need the most attention.
+              </p>
+
+              {subjectWeakness.length === 0 ? (
+                <div style={S.empty}>No subject data for the selected filters.</div>
+              ) : (
+                <>
+                  <Bar
+                    data={{
+                      labels: subjectWeakness.map((s) => s.label),
+                      datasets: [{
+                        label: 'School-wide Average',
+                        data: subjectWeakness.map((s) => s.avg),
+                        backgroundColor: subjectWeakness.map((s) =>
+                          s.avg >= 80 ? '#22c55e' : s.avg >= 60 ? '#84cc16' : s.avg >= 40 ? '#f59e0b' : '#ef4444'
+                        ),
+                        borderRadius: 6,
+                      }],
+                    }}
+                    options={{
+                      ...baseChartOptions,
+                      indexAxis: 'y',
+                      scales: { x: { min: 0, max: 100, ticks: { stepSize: 20 } }, y: {} },
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => ` Average: ${ctx.parsed.x?.toFixed(1)}` } },
+                      },
+                    }}
+                  />
+                  <div style={{ overflowX: 'auto', marginTop: '24px' }}>
+                    <table style={S.table}>
+                      <thead>
+                        <tr>
+                          <th style={S.th}>Rank</th>
+                          <th style={S.th}>Subject</th>
+                          <th style={{ ...S.th, textAlign: 'center' }}>School Average</th>
+                          <th style={{ ...S.th, textAlign: 'center' }}>Students</th>
+                          <th style={S.th}>Performance Band</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subjectWeakness.map((s, i) => {
+                          const { bg, text } = scoreColor(s.avg);
+                          return (
+                            <tr key={s.subj} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <td style={{ ...S.td, fontWeight: '700', color: i < 3 ? '#ef4444' : '#6b7280', fontSize: '0.95rem' }}>
+                                {i + 1}
+                              </td>
+                              <td style={{ ...S.td, fontWeight: '600' }}>{s.label}</td>
+                              <td style={{ ...S.td, textAlign: 'center' }}>
+                                <span style={{ background: bg, color: text, padding: '3px 12px', borderRadius: '20px', fontWeight: '700', fontSize: '0.875rem' }}>
+                                  {s.avg.toFixed(1)}
+                                </span>
+                              </td>
+                              <td style={{ ...S.td, textAlign: 'center', color: '#6b7280' }}>{s.count}</td>
+                              <td style={{ ...S.td, color: text, fontWeight: '500', fontSize: '0.85rem' }}>
+                                {bandLabel(s.avg)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Analytics;

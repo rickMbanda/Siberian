@@ -11,6 +11,7 @@ import Reports from './Pages/Reports';
 import ResultsManager from './Pages/ResultsManager';
 import StudentManager from './Pages/StudentManager';
 import UserManagement from './Pages/UserManagement';
+import Analytics from './Pages/Analytics';
 import ChangePassword from './Pages/ChangePassword';
 
 const ProtectedRoutes = () => {
@@ -45,6 +46,7 @@ const ProtectedRoutes = () => {
         <>
           <Route path="/" element={<Dashboard />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/results-manager" element={<ResultsManager />} />
           <Route path="/students" element={<StudentManager />} />
           <Route path="/users" element={<UserManagement />} />

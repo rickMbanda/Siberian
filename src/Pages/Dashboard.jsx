@@ -332,6 +332,36 @@ const Dashboard = () => {
           >
             ⚙️ Manage Results
           </Link>
+
+          <Link 
+            to="/analytics" 
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px 32px',
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+              color: '#ffffff',
+              textDecoration: 'none',
+              borderRadius: '12px',
+              fontSize: 'clamp(1rem, 2vw, 1.1rem)',
+              fontWeight: '600',
+              boxShadow: '0 8px 32px rgba(139, 92, 246, 0.3)',
+              transition: 'all 0.3s ease',
+              minWidth: '180px',
+              transform: 'scale(1)'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'scale(1.05) translateY(-2px)';
+              e.target.style.boxShadow = '0 12px 48px rgba(139, 92, 246, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'scale(1) translateY(0px)';
+              e.target.style.boxShadow = '0 8px 32px rgba(139, 92, 246, 0.3)';
+            }}
+          >
+            📊 Analytics
+          </Link>
         </div>
       </div>
     </div>
