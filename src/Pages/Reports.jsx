@@ -608,72 +608,81 @@ const Reports = () => {
   }, [marklistStudents, marklistClass, printOrientation]);
 
 
-  // Memoize print handlers for performance and to avoid unnecessary re-renders
-  const handlePrintIndividual = useReactToPrint({
-    contentRef: individualRef,
-    documentTitle: `Individual_Report_${selectedStudent?.name || 'Student'}`,
-    removeAfterPrint: true,
-    onBeforeGetContent: () => {
-      return new Promise((resolve) => {
-        const existingStyles = document.querySelectorAll('[data-print-styles]');
-        existingStyles.forEach(style => style.remove());
+  // Print individual report: capture with html2canvas (same pipeline as
+  // download) so print preview is pixel-identical to the downloaded PDF.
+  const [printingIndividual, setPrintingIndividual] = useState(false);
+  const handlePrintIndividual = useCallback(async () => {
+    if (!selectedStudent || !individualRef.current) return;
 
-        // Calculate a zoom so the on-screen report fits on one A4 page.
-        // A4 usable height at 96 dpi with 8mm margins ≈ 1059 px.
-        const el = individualRef.current;
-        const contentHeight = el ? el.scrollHeight : 1400;
-        const a4UsablePx = 1059;
-        const zoom = Math.min(1, parseFloat((a4UsablePx / contentHeight).toFixed(3)));
+    setPrintingIndividual(true);
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .no-print { display: none !important; }
+        button { display: none !important; }
+        nav { display: none !important; }
+        .exam-nav { display: none !important; }
+      `;
+      document.head.appendChild(style);
 
-        // Inject print styles that preserve the on-screen appearance and
-        // scale the whole report to fit a single A4 portrait page.
-        const printStyles = `
-          @media print {
-            @page { size: A4 portrait; margin: 8mm; }
-            body * { visibility: hidden; }
-            .print-container, .print-container * { visibility: visible; }
-            .print-container {
-              position: absolute !important;
-              top: 0 !important;
-              left: 0 !important;
-              width: 194mm !important;
-              margin: 0 !important;
-              padding: 0 !important;
-            }
-            .print-container .report-card {
-              zoom: ${zoom} !important;
-              max-width: 100% !important;
-              box-shadow: none !important;
-              border-radius: 0 !important;
-              padding: 12px !important;
-            }
-            .no-print { display: none !important; }
-            button { display: none !important; }
-            nav { display: none !important; }
-            .exam-nav { display: none !important; }
-            * {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-          }
-        `;
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      );
+      await new Promise((resolve) => setTimeout(resolve, 250));
 
-        const styleSheet = document.createElement('style');
-        styleSheet.type = 'text/css';
-        styleSheet.innerText = printStyles;
-        styleSheet.setAttribute('data-print-styles', 'true');
-        document.head.appendChild(styleSheet);
-
-        const restore = () => {
-          styleSheet.remove();
-          window.removeEventListener('afterprint', restore);
-        };
-        window.addEventListener('afterprint', restore);
-
-        setTimeout(resolve, 250);
+      const canvas = await html2canvas(individualRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: individualRef.current.scrollWidth,
+        height: individualRef.current.scrollHeight
       });
+
+      document.head.removeChild(style);
+
+      // Build the same single-page A4 PDF used for download
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const margin = 8;
+      const availableWidth  = 210 - margin * 2;
+      const availableHeight = 297 - margin * 2;
+
+      const canvasAspect    = canvas.height / canvas.width;
+      const availableAspect = availableHeight / availableWidth;
+
+      let imgWidth, imgHeight;
+      if (canvasAspect > availableAspect) {
+        imgHeight = availableHeight;
+        imgWidth  = imgHeight / canvasAspect;
+      } else {
+        imgWidth  = availableWidth;
+        imgHeight = imgWidth * canvasAspect;
+      }
+
+      const xOffset = margin + (availableWidth - imgWidth) / 2;
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xOffset, margin, imgWidth, imgHeight);
+
+      // Open the PDF in a new window and trigger the browser print dialog
+      const blob    = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      const win     = window.open(blobUrl);
+      if (win) {
+        win.addEventListener('load', () => {
+          win.focus();
+          win.print();
+          win.addEventListener('afterprint', () => {
+            win.close();
+            URL.revokeObjectURL(blobUrl);
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Error generating print preview:', error);
+      alert('Error generating print preview. Please try again.');
+    } finally {
+      setPrintingIndividual(false);
     }
-  });
+  }, [selectedStudent]);
 
   const handlePrintClass = useReactToPrint({
     contentRef: classRef,
@@ -1152,12 +1161,12 @@ const Reports = () => {
           onClick={handlePrintIndividual}
           style={{
             ...styles.button,
-            opacity: !selectedStudent ? 0.6 : 1,
-            cursor: !selectedStudent ? 'not-allowed' : 'pointer'
+            opacity: (!selectedStudent || printingIndividual) ? 0.6 : 1,
+            cursor: (!selectedStudent || printingIndividual) ? 'not-allowed' : 'pointer'
           }}
-          disabled={!selectedStudent}
+          disabled={!selectedStudent || printingIndividual}
         >
-          Print Individual Report ({printOrientation})
+          {printingIndividual ? 'Preparing print…' : 'Print Individual Report'}
         </button>
         <button
           onClick={handleDownloadIndividual}
