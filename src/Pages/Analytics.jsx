@@ -16,6 +16,7 @@ import {
 import { Bar, Line } from 'react-chartjs-2';
 import ExamNavigation from '../Components/ExamNavigation';
 import { fetchResults } from '../api/results';
+import { fetchTarget } from '../api/targets';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Filler, Title, Tooltip, Legend);
 
@@ -158,6 +159,15 @@ const Analytics = () => {
 
   const [downloadingSummary, setDownloadingSummary] = useState(false);
   const summaryRef = useRef();
+
+  const [schoolTarget, setSchoolTarget] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchTarget(selectedYear)
+      .then(t => { if (!cancelled) setSchoolTarget(t?.targetMean ?? null); })
+      .catch(() => { if (!cancelled) setSchoolTarget(null); });
+    return () => { cancelled = true; };
+  }, [selectedYear]);
 
   useEffect(() => {
     let cancelled = false;
@@ -452,23 +462,47 @@ const Analytics = () => {
                       </div>
                     ))}
                   </div>
+                  {schoolTarget != null && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <div style={{ width: '24px', borderTop: '2px dashed #dc2626' }} />
+                      <span style={{ fontSize: '0.8rem', color: '#dc2626', fontWeight: '600' }}>
+                        Target: {schoolTarget} — classes below target are highlighted in red
+                      </span>
+                    </div>
+                  )}
                   <Bar
                     data={{
                       labels: classComparison.labels,
-                      datasets: [{
-                        label: 'Class Mean',
-                        data: classComparison.means,
-                        backgroundColor: classComparison.means.map((m) =>
-                          m === null ? '#e5e7eb' : m >= 80 ? '#22c55e' : m >= 60 ? '#84cc16' : m >= 40 ? '#f59e0b' : '#ef4444'
-                        ),
-                        borderRadius: 6,
-                      }],
+                      datasets: [
+                        {
+                          type: 'bar',
+                          label: 'Class Mean',
+                          data: classComparison.means,
+                          backgroundColor: classComparison.means.map((m) => {
+                            if (m === null) return '#e5e7eb';
+                            if (schoolTarget != null && m < schoolTarget) return '#ef4444';
+                            return m >= 80 ? '#22c55e' : m >= 60 ? '#84cc16' : m >= 40 ? '#f59e0b' : '#ef4444';
+                          }),
+                          borderRadius: 6,
+                        },
+                        ...(schoolTarget != null ? [{
+                          type: 'line',
+                          label: `Target (${schoolTarget})`,
+                          data: classComparison.labels.map(() => schoolTarget),
+                          borderColor: '#dc2626',
+                          borderWidth: 2,
+                          borderDash: [8, 4],
+                          pointRadius: 0,
+                          fill: false,
+                          tension: 0,
+                        }] : []),
+                      ],
                     }}
                     options={{
                       ...baseChartOptions,
                       plugins: {
-                        legend: { display: false },
-                        tooltip: { callbacks: { label: (ctx) => ` Mean: ${ctx.parsed.y?.toFixed(1) ?? 'N/A'}` } },
+                        legend: { display: schoolTarget != null },
+                        tooltip: { callbacks: { label: (ctx) => ctx.dataset.type === 'line' ? ` Target: ${ctx.parsed.y}` : ` Mean: ${ctx.parsed.y?.toFixed(1) ?? 'N/A'}` } },
                       },
                     }}
                   />

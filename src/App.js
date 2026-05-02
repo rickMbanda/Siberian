@@ -12,6 +12,9 @@ import ResultsManager from './Pages/ResultsManager';
 import StudentManager from './Pages/StudentManager';
 import UserManagement from './Pages/UserManagement';
 import Analytics from './Pages/Analytics';
+import Promotion from './Pages/Promotion';
+import Targets from './Pages/Targets';
+import ParentSlip from './Pages/ParentSlip';
 import ChangePassword from './Pages/ChangePassword';
 
 const ProtectedRoutes = () => {
@@ -50,6 +53,8 @@ const ProtectedRoutes = () => {
           <Route path="/results-manager" element={<ResultsManager />} />
           <Route path="/students" element={<StudentManager />} />
           <Route path="/users" element={<UserManagement />} />
+          <Route path="/promotion" element={<Promotion />} />
+          <Route path="/targets" element={<Targets />} />
         </>
       ) : (
         <Route path="/" element={<Navigate to="/opener" replace />} />
@@ -68,6 +73,8 @@ const ProtectedRoutes = () => {
           <Route path="/results-manager" element={<Navigate to="/opener" replace />} />
           <Route path="/students" element={<Navigate to="/opener" replace />} />
           <Route path="/users" element={<Navigate to="/opener" replace />} />
+          <Route path="/promotion" element={<Navigate to="/opener" replace />} />
+          <Route path="/targets" element={<Navigate to="/opener" replace />} />
         </>
       )}
 
@@ -80,7 +87,10 @@ const ProtectedRoutes = () => {
 const App = () => (
   <AuthProvider>
     <BrowserRouter>
-      <ProtectedRoutes />
+      <Routes>
+        <Route path="/slip/:pin" element={<ParentSlip />} />
+        <Route path="/*" element={<ProtectedRoutes />} />
+      </Routes>
     </BrowserRouter>
   </AuthProvider>
 );

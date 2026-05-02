@@ -5,6 +5,7 @@ import IndividualReport from '../Components/IndividualReport';
 import ClassMarklist from '../Components/ClassMarklist';
 import ExamNavigation from '../Components/ExamNavigation';
 import { fetchResults } from '../api/results';
+import { generateParentPin, fetchPinForStudent, revokeParentPin } from '../api/parentPins';
 import '../Components/examModuleStyles.css';
 
 const Reports = () => {
@@ -44,6 +45,26 @@ const Reports = () => {
 
   const individualRef = useRef();
   const classRef = useRef();
+
+  const [parentPin, setParentPin] = useState(null);
+  const [pinLoading, setPinLoading] = useState(false);
+  const [pinCopied, setPinCopied] = useState(false);
+
+  // Load existing PIN whenever the selected student / term / exam changes.
+  useEffect(() => {
+    if (!selectedStudentId) { setParentPin(null); return; }
+    const rec = (Array.isArray(allStudents) ? allStudents : []).find(
+      s => (s.studentRecordId || `${(s.name||'').toLowerCase()}|${(s.class||'').toLowerCase()}`) === selectedStudentId
+    );
+    const sid = rec?.studentRecordId;
+    if (!sid) { setParentPin(null); return; }
+    let cancelled = false;
+    fetchPinForStudent({ studentRecordId: sid, academicYear: selectedYear, term: individualTerm, examType: individualExamType })
+      .then(p => { if (!cancelled) setParentPin(p || null); })
+      .catch(() => { if (!cancelled) setParentPin(null); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStudentId, selectedYear, individualTerm, individualExamType]);
 
   // Fetch results for the selected academic year. The backend returns one
   // flat row per (student, term, examType) — we dedupe to one entry per
@@ -1036,6 +1057,67 @@ const Reports = () => {
           {batchPreparing
             ? <>Rendering <strong>{batchStudents.length}</strong> student reports — this can take a few seconds for big classes…</>
             : <>Capturing reports — a print window will open automatically when ready.</>}
+        </div>
+      )}
+
+      {/* ── Parent PIN Management ── */}
+      {selectedStudent && (
+        <div className="no-print" style={{ marginTop: '1.5em', padding: '1.2em 1.5em', background: '#f0fdf4', border: '2px solid #86efac', borderRadius: '12px' }}>
+          <h4 style={{ margin: '0 0 0.8em 0', color: '#166534', fontWeight: '700', fontSize: '1rem' }}>🔑 Parent Result Slip</h4>
+          <p style={{ margin: '0 0 0.8em 0', color: '#4b5563', fontSize: '0.9rem' }}>
+            Generate a secure PIN so a parent can view this student's result slip without logging in.
+          </p>
+          {parentPin ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+              <div style={{ padding: '8px 14px', background: '#fff', border: '1px solid #86efac', borderRadius: '8px', fontFamily: 'monospace', fontWeight: '700', fontSize: '1.1rem', letterSpacing: '3px', color: '#166534' }}>
+                {parentPin.pin}
+              </div>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/slip/${parentPin.pin}`;
+                  navigator.clipboard.writeText(url).then(() => { setPinCopied(true); setTimeout(() => setPinCopied(false), 2000); });
+                }}
+                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #4f8cff', background: '#4f8cff', color: '#fff', fontWeight: '600', fontSize: '0.875rem', cursor: 'pointer' }}
+              >
+                {pinCopied ? '✅ Copied!' : '📋 Copy Link'}
+              </button>
+              <button
+                disabled={pinLoading}
+                onClick={async () => {
+                  setPinLoading(true);
+                  try { await revokeParentPin(parentPin.pin); setParentPin(null); }
+                  catch (e) { alert('Could not revoke PIN. Please try again.'); }
+                  finally { setPinLoading(false); }
+                }}
+                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #ef4444', background: '#ef4444', color: '#fff', fontWeight: '600', fontSize: '0.875rem', cursor: pinLoading ? 'wait' : 'pointer', opacity: pinLoading ? 0.6 : 1 }}
+              >
+                🗑 Revoke PIN
+              </button>
+              <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                Expires: {parentPin.expiresAt ? new Date(parentPin.expiresAt).toLocaleDateString() : 'Never'}
+              </span>
+            </div>
+          ) : (
+            <button
+              disabled={pinLoading || !selectedStudent}
+              onClick={async () => {
+                const rec = (Array.isArray(allStudents) ? allStudents : []).find(
+                  s => (s.studentRecordId || `${(s.name||'').toLowerCase()}|${(s.class||'').toLowerCase()}`) === selectedStudentId
+                );
+                const sid = rec?.studentRecordId;
+                if (!sid) { alert('Could not identify student record ID.'); return; }
+                setPinLoading(true);
+                try {
+                  const p = await generateParentPin({ studentRecordId: sid, academicYear: selectedYear, term: individualTerm, examType: individualExamType });
+                  setParentPin(p);
+                } catch (e) { alert('Could not generate PIN. Please try again.'); }
+                finally { setPinLoading(false); }
+              }}
+              style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg,#166534,#16a34a)', color: '#fff', fontWeight: '700', fontSize: '0.875rem', cursor: pinLoading ? 'wait' : 'pointer', opacity: pinLoading ? 0.6 : 1 }}
+            >
+              {pinLoading ? 'Generating…' : '🔑 Generate Parent PIN'}
+            </button>
+          )}
         </div>
       )}
 

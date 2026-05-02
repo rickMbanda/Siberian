@@ -144,6 +144,16 @@ const ExamNavigation = () => {
                   Results Manager
                 </button>
               </Link>
+              <Link to="/promotion" style={{ textDecoration: 'none' }}>
+                <button className={`nav-button ${location.pathname === '/promotion' ? 'active' : ''}`}>
+                  Promotion
+                </button>
+              </Link>
+              <Link to="/targets" style={{ textDecoration: 'none' }}>
+                <button className={`nav-button ${location.pathname === '/targets' ? 'active' : ''}`}>
+                  Targets
+                </button>
+              </Link>
               <Link to="/users" style={{ textDecoration: 'none' }}>
                 <button className={`nav-button ${location.pathname === '/users' ? 'active' : ''}`}>
                   Users

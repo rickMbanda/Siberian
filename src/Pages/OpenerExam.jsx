@@ -8,6 +8,7 @@ import { loadGradingRows } from '../Utils/loadGradingRows';
 import ExamNavigation from '../Components/ExamNavigation';
 import { getSubjectsByClass } from '../Utils/subjectsByClass';
 import { useAuth } from '../contexts/AuthContext';
+import CsvImportModal from '../Components/CsvImportModal';
 
 const OpenerExam = () => {
   const location = useLocation();
@@ -29,6 +30,7 @@ const OpenerExam = () => {
   const [students, setStudents] = useState([]);
   const [loadingExisting, setLoadingExisting] = useState(true);
   const [lockStatus, setLockStatus] = useState({ locked: false, effectiveAt: null });
+  const [csvOpen, setCsvOpen] = useState(false);
 
   const loadLockStatus = async () => {
     try {
@@ -160,19 +162,26 @@ const OpenerExam = () => {
       <div style={styles.contentWrapper}>
         <div style={styles.header}>
           <img src="/logschool.png" alt="School Logo" style={styles.logo} />
-          <div>
+          <div style={{ flex: 1 }}>
             <h1 style={styles.title}>Opener Exam Results</h1>
             <p style={styles.subtitle}>
               {selectedYear} – {selectedTerm} – Class: {selectedClass}
               {loadingExisting && <span style={{ color: '#667eea', marginLeft: 10 }}>Loading…</span>}
             </p>
             <p style={{ color: lockStatus.locked ? '#a62323' : '#1f6feb', marginTop: '8px', fontWeight: '600' }}>
-              {lockStatus.locked
-                ? `Locked for teacher entry.`
-                : 'Open for teacher entry.'}
+              {lockStatus.locked ? 'Locked for teacher entry.' : 'Open for teacher entry.'}
             </p>
           </div>
+          {!lockStatus.locked && (
+            <button
+              onClick={() => setCsvOpen(true)}
+              style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg,#0369a1,#0284c7)', color: '#fff', fontWeight: '700', fontSize: '0.875rem', cursor: 'pointer', whiteSpace: 'nowrap', alignSelf: 'center' }}
+            >
+              📁 Import CSV
+            </button>
+          )}
         </div>
+        <CsvImportModal open={csvOpen} onClose={() => setCsvOpen(false)} selectedClass={selectedClass} selectedTerm={selectedTerm} selectedYear={selectedYear} examType="opener" onImported={async () => { const rows = await import('../Utils/loadGradingRows').then(m => m.loadGradingRows({ selectedClass, selectedYear, selectedTerm, examType: 'opener', subjects })); setStudents(rows); }} />
         <DataEntryGrid
           students={students}
           updateStudent={updateStudent}
