@@ -237,10 +237,8 @@ const Reports = () => {
     if (!selectedStudent || !individualRef.current) return;
 
     setDownloadingIndividual(true);
-    // Activate the single-page compact layout for the captured PDF.
-    document.body.classList.add('report-print-mode');
     try {
-      // Hide buttons and navigation during capture
+      // Hide only UI chrome — keep the on-screen report appearance intact
       const style = document.createElement('style');
       style.innerHTML = `
         .no-print { display: none !important; }
@@ -250,7 +248,7 @@ const Reports = () => {
       `;
       document.head.appendChild(style);
 
-      // Allow the compact layout + chart resize to settle before capture.
+      // Let the DOM settle after hiding chrome elements
       await new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(resolve))
       );
@@ -265,36 +263,36 @@ const Reports = () => {
         height: individualRef.current.scrollHeight
       });
 
-      // Remove the temporary style
       document.head.removeChild(style);
 
-      const imgWidth = 210; // A4 width in mm
-      const pageHeight = 295; // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
+      // Always fit the entire report onto exactly one A4 page
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const margin = 8;
+      const availableWidth  = 210 - margin * 2;
+      const availableHeight = 297 - margin * 2;
 
-      const pdf = new jsPDF(printOrientation, 'mm', 'a4');
-      let position = 0;
+      const canvasAspect    = canvas.height / canvas.width;
+      const availableAspect = availableHeight / availableWidth;
 
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+      let imgWidth, imgHeight;
+      if (canvasAspect > availableAspect) {
+        imgHeight = availableHeight;
+        imgWidth  = imgHeight / canvasAspect;
+      } else {
+        imgWidth  = availableWidth;
+        imgHeight = imgWidth * canvasAspect;
       }
 
+      const xOffset = margin + (availableWidth - imgWidth) / 2;
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xOffset, margin, imgWidth, imgHeight);
       pdf.save(`Individual_Report_${selectedStudent.name}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF. Please try again.');
     } finally {
-      document.body.classList.remove('report-print-mode');
       setDownloadingIndividual(false);
     }
-  }, [selectedStudent, printOrientation]);
+  }, [selectedStudent]);
 
   // ── Batch Download (all individual reports for the selected class) ───────
   // Builds one PDF that contains every student's IndividualReport for the
@@ -617,56 +615,45 @@ const Reports = () => {
     removeAfterPrint: true,
     onBeforeGetContent: () => {
       return new Promise((resolve) => {
-        // Remove any existing print styles
         const existingStyles = document.querySelectorAll('[data-print-styles]');
         existingStyles.forEach(style => style.remove());
 
-        // Activate the single-page compact layout for the printed page.
-        document.body.classList.add('report-print-mode');
+        // Calculate a zoom so the on-screen report fits on one A4 page.
+        // A4 usable height at 96 dpi with 8mm margins ≈ 1059 px.
+        const el = individualRef.current;
+        const contentHeight = el ? el.scrollHeight : 1400;
+        const a4UsablePx = 1059;
+        const zoom = Math.min(1, parseFloat((a4UsablePx / contentHeight).toFixed(3)));
 
-        // Restore the live layout once the print dialog is closed (whether
-        // the user printed or cancelled). Bound once per print invocation.
-        const restore = () => {
-          document.body.classList.remove('report-print-mode');
-          window.removeEventListener('afterprint', restore);
-        };
-        window.addEventListener('afterprint', restore);
-
-        // Add new print styles with current orientation
+        // Inject print styles that preserve the on-screen appearance and
+        // scale the whole report to fit a single A4 portrait page.
         const printStyles = `
           @media print {
+            @page { size: A4 portrait; margin: 8mm; }
             body * { visibility: hidden; }
             .print-container, .print-container * { visibility: visible; }
-            .print-container { 
-              position: absolute; 
-              top: 0; 
-              left: 0; 
-              width: 100% !important; 
+            .print-container {
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 194mm !important;
               margin: 0 !important;
               padding: 0 !important;
-              page-break-inside: avoid;
+            }
+            .print-container .report-card {
+              zoom: ${zoom} !important;
+              max-width: 100% !important;
+              box-shadow: none !important;
+              border-radius: 0 !important;
+              padding: 12px !important;
             }
             .no-print { display: none !important; }
             button { display: none !important; }
             nav { display: none !important; }
             .exam-nav { display: none !important; }
-            table { 
-              page-break-inside: auto !important;
-              width: 100% !important;
-            }
-            tr { 
-              page-break-inside: avoid !important;
-              page-break-after: auto !important;
-            }
-            thead {
-              display: table-header-group !important;
-            }
-            tbody {
-              display: table-row-group !important;
-            }
-            @page {
-              size: ${printOrientation === 'landscape' ? 'landscape' : 'portrait'};
-              margin: 0.3in 0.4in;
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
           }
         `;
@@ -677,7 +664,12 @@ const Reports = () => {
         styleSheet.setAttribute('data-print-styles', 'true');
         document.head.appendChild(styleSheet);
 
-        // Allow the compact layout to apply + chart to resize before print.
+        const restore = () => {
+          styleSheet.remove();
+          window.removeEventListener('afterprint', restore);
+        };
+        window.addEventListener('afterprint', restore);
+
         setTimeout(resolve, 250);
       });
     }
