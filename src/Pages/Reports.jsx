@@ -1,5 +1,4 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { useReactToPrint } from 'react-to-print';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import IndividualReport from '../Components/IndividualReport';
@@ -666,125 +665,86 @@ const Reports = () => {
     }
   }, [selectedStudent]);
 
-  const handlePrintClass = useReactToPrint({
-    contentRef: classRef,
-    documentTitle: `Class_Marklist_${marklistClass !== 'All Classes' ? marklistClass : 'All'}`,
-    removeAfterPrint: true,
-    onBeforeGetContent: () => {
-      return new Promise((resolve) => {
-        // Remove any existing print styles
-        const existingStyles = document.querySelectorAll('[data-print-styles-marklist]');
-        existingStyles.forEach(style => style.remove());
+  const [printingClass, setPrintingClass] = useState(false);
+  const handlePrintClass = useCallback(async () => {
+    if (!classRef.current || marklistStudents.length === 0) return;
 
-        // Add new print styles with current orientation
-        const printStyles = `
-          @media print {
-            body * { visibility: hidden; }
-            .print-container, .print-container * { visibility: visible; }
-            .print-container { 
-              /* Preserve original container styling and layout */
-            }
-            .no-print { display: none !important; }
-            button { display: none !important; }
-            nav { display: none !important; }
-            .exam-nav { display: none !important; }
+    setPrintingClass(true);
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .no-print { display: none !important; }
+        button { display: none !important; }
+        nav { display: none !important; }
+        .exam-nav { display: none !important; }
+        .table-wrapper { overflow: visible !important; max-height: none !important; height: auto !important; }
+      `;
+      document.head.appendChild(style);
 
-            /* Allow table wrapper to print fully */
-            .table-wrapper, .print-table-wrapper {
-              overflow: visible !important;
-              max-height: none !important;
-              height: auto !important;
-              page-break-inside: auto !important;
-            }
-            
-            table, .print-optimized-table { 
-              page-break-inside: auto !important;
-              /* Preserve original table styling and width */
-            }
-            
-            tr, .print-table-row { 
-              page-break-inside: avoid !important;
-              page-break-after: auto !important;
-              height: auto !important;
-            }
-            
-            th, td {
-              page-break-inside: avoid !important;
-              /* Preserve original cell styling */
-            }
-            
-            th, .print-table-header th {
-              /* Preserve original header styling */
-              -webkit-print-color-adjust: exact !important;
-              color-adjust: exact !important;
-            }
-            
-            thead, .print-table-header {
-              display: table-header-group !important;
-            }
-            
-            tbody, .print-table-body {
-              display: table-row-group !important;
-            }
-            
-            tfoot {
-              display: table-footer-group !important;
-            }
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-            /* Statistics sections should stay together */
-            div[style*="grid"] {
-              page-break-inside: avoid !important;
-            }
-
-            /* Preserve original heading and text colors */
-            .print-container h3,
-            .print-container h4 {
-              -webkit-print-color-adjust: exact !important;
-              color-adjust: exact !important;
-            }
-
-            /* Ensure images scale properly */
-            img {
-              max-width: 100% !important;
-              height: auto !important;
-              page-break-inside: avoid !important;
-            }
-
-            /* Allow scrollable content to print fully */
-            .table-wrapper {
-              overflow: visible !important;
-              max-height: none !important;
-              height: auto !important;
-            }
-
-            /* Preserve original colors and styling */
-            .print-container * {
-              -webkit-print-color-adjust: exact !important;
-              color-adjust: exact !important;
-            }
-
-            @page {
-              size: ${printOrientation === 'landscape' ? 'A4 landscape' : 'A4 portrait'};
-              margin: 0.3in;
-            }
-
-            /* Repeat table headers on each page */
-            @page :first {
-              margin-top: 0.5in;
-            }
-          }
-        `;
-
-        const styleSheet = document.createElement('style');
-        styleSheet.type = 'text/css';
-        styleSheet.innerText = printStyles;
-        styleSheet.setAttribute('data-print-styles-marklist', 'true');
-        document.head.appendChild(styleSheet);
-
-        setTimeout(resolve, 100);
+      const canvas = await html2canvas(classRef.current, {
+        scale: printOrientation === 'landscape' ? 1.5 : 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: classRef.current.scrollWidth,
+        height: classRef.current.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: classRef.current.scrollWidth,
+        windowHeight: classRef.current.scrollHeight
       });
+
+      document.head.removeChild(style);
+
+      const orientation = printOrientation === 'landscape' ? 'l' : 'p';
+      const pdf         = new jsPDF(orientation, 'mm', 'a4');
+      const pdfW        = pdf.internal.pageSize.getWidth();
+      const pdfH        = pdf.internal.pageSize.getHeight();
+      const margin      = 7.62;
+      const availW      = pdfW - margin * 2;
+      const availH      = pdfH - margin * 2;
+
+      const imgW        = availW;
+      const imgH        = (canvas.height * imgW) / canvas.width;
+
+      if (imgH <= availH) {
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, imgH);
+      } else {
+        const totalPages = Math.ceil(imgH / availH);
+        for (let page = 0; page < totalPages; page++) {
+          if (page > 0) pdf.addPage(orientation);
+          const srcY   = page * availH * (canvas.height / imgH);
+          const srcH   = Math.min(availH * (canvas.height / imgH), canvas.height - srcY);
+          const pg     = document.createElement('canvas');
+          pg.width     = canvas.width;
+          pg.height    = srcH;
+          pg.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+          pdf.addImage(pg.toDataURL('image/png'), 'PNG', margin, margin, imgW, Math.min(availH, imgH - page * availH));
+        }
+      }
+
+      const blob    = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      const win     = window.open(blobUrl);
+      if (win) {
+        win.addEventListener('load', () => {
+          win.focus();
+          win.print();
+          win.addEventListener('afterprint', () => {
+            win.close();
+            URL.revokeObjectURL(blobUrl);
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Error generating class print:', error);
+      alert('Error generating print. Please try again.');
+    } finally {
+      setPrintingClass(false);
     }
-  });
+  }, [classRef, marklistStudents, printOrientation]);
 
   const styles = {
     container: { padding: '2em', fontFamily: 'sans-serif' },
@@ -1295,10 +1255,14 @@ const Reports = () => {
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button
             onClick={handlePrintClass}
-            style={styles.button}
-            disabled={marklistStudents.length === 0}
+            style={{
+              ...styles.button,
+              opacity: (marklistStudents.length === 0 || printingClass) ? 0.6 : 1,
+              cursor: (marklistStudents.length === 0 || printingClass) ? 'not-allowed' : 'pointer'
+            }}
+            disabled={marklistStudents.length === 0 || printingClass}
           >
-            Print Class Marklist ({printOrientation})
+            {printingClass ? 'Preparing print…' : 'Print Class Marklist'}
           </button>
           <button
             onClick={handleDownloadClass}
