@@ -400,89 +400,18 @@ const Reports = () => {
 
     setDownloadingClass(true);
     try {
-      // Enhanced print styles for complete document capture
       const style = document.createElement('style');
       style.innerHTML = `
         .no-print { display: none !important; }
         button { display: none !important; }
         nav { display: none !important; }
         .exam-nav { display: none !important; }
-
-        /* Preserve in-app styling for PDF capture */
-        .print-container {
-          overflow: visible !important;
-          height: auto !important;
-          max-height: none !important;
-          /* Preserve original container styling */
-        }
-
-        .print-container .table-wrapper {
-          overflow: visible !important;
-          max-height: none !important;
-          height: auto !important;
-          /* Preserve original table wrapper styling */
-        }
-
-        .print-container table {
-          overflow: visible !important;
-          height: auto !important;
-          /* Preserve original table styling and layout */
-        }
-
-        .print-container th,
-        .print-container td {
-          overflow: visible !important;
-          /* Preserve original cell styling */
-        }
-
-        .print-container th {
-          /* Preserve original header styling */
-          -webkit-print-color-adjust: exact !important;
-          color-adjust: exact !important;
-        }
-
-        .print-container tbody tr {
-          page-break-inside: avoid !important;
-          page-break-after: auto !important;
-        }
-
-        /* Ensure letterhead scales properly */
-        .print-container img {
-          max-width: 100% !important;
-          height: auto !important;
-          page-break-inside: avoid !important;
-        }
-
-        /* Statistics sections */
-        .print-container div[style*="grid"] {
-          page-break-inside: avoid !important;
-        }
-
-        /* Preserve original colors and styling for PDF */
-        .print-container h3,
-        .print-container h4 {
-          -webkit-print-color-adjust: exact !important;
-          color-adjust: exact !important;
-        }
-
-        /* Preserve original text colors */
-        .print-container * {
-          -webkit-print-color-adjust: exact !important;
-          color-adjust: exact !important;
-        }
-
-        /* Allow content to be captured fully */
-        .table-wrapper {
-          overflow: visible !important;
-          max-height: none !important;
-        }
+        .table-wrapper { overflow: visible !important; max-height: none !important; height: auto !important; }
       `;
       document.head.appendChild(style);
 
-      // Wait for styles to apply
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Capture with optimized settings for large documents
       const canvas = await html2canvas(classRef.current, {
         scale: printOrientation === 'landscape' ? 1.5 : 2,
         useCORS: true,
@@ -493,100 +422,48 @@ const Reports = () => {
         scrollX: 0,
         scrollY: 0,
         windowWidth: classRef.current.scrollWidth,
-        windowHeight: classRef.current.scrollHeight,
-        ignoreElements: (element) => {
-          return element.classList && (
-            element.classList.contains('no-print') ||
-            element.tagName === 'BUTTON' ||
-            element.tagName === 'NAV'
-          );
-        }
+        windowHeight: classRef.current.scrollHeight
       });
 
-      // Remove the temporary style
       document.head.removeChild(style);
 
-      // Always use landscape orientation for class marklist downloads
-      const orientation = 'l'; // Force landscape for better table readability
-      const pdf = new jsPDF(orientation, 'mm', 'a4');
+      const orientation = printOrientation === 'landscape' ? 'l' : 'p';
+      const pdf         = new jsPDF(orientation, 'mm', 'a4');
+      const pdfW        = pdf.internal.pageSize.getWidth();
+      const pdfH        = pdf.internal.pageSize.getHeight();
+      const margin      = 7.62;
+      const availW      = pdfW - margin * 2;
+      const availH      = pdfH - margin * 2;
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const margin = 7.62; // 0.3in margin (matches print preview @page margin)
-      const availableWidth = pdfWidth - (margin * 2);
-      const availableHeight = pdfHeight - (margin * 2);
+      const imgW = availW;
+      const imgH = (canvas.height * imgW) / canvas.width;
 
-      // Calculate scaling to fit content properly with improved page splitting
-      const imgWidth = availableWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      // Check if content fits on one page
-      if (imgHeight > availableHeight) {
-        // Multi-page document - split content intelligently
-        const pageHeight = availableHeight;
-        const totalPages = Math.ceil(imgHeight / pageHeight);
-
+      if (imgH <= availH) {
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, imgH);
+      } else {
+        const totalPages = Math.ceil(imgH / availH);
         for (let page = 0; page < totalPages; page++) {
           if (page > 0) pdf.addPage(orientation);
-
-          // Calculate source coordinates for this page
-          const sourceY = page * pageHeight * (canvas.height / imgHeight);
-          const sourceHeight = Math.min(
-            pageHeight * (canvas.height / imgHeight), 
-            canvas.height - sourceY
-          );
-
-          // Create a canvas for each page
-          const pageCanvas = document.createElement('canvas');
-          const pageCtx = pageCanvas.getContext('2d');
-
-          pageCanvas.width = canvas.width;
-          pageCanvas.height = sourceHeight;
-
-          // Draw the portion of the original canvas for this page
-          pageCtx.drawImage(
-            canvas,
-            0, sourceY, canvas.width, sourceHeight,
-            0, 0, canvas.width, sourceHeight
-          );
-
-          // Calculate dimensions for this page
-          const pageImgWidth = imgWidth;
-          const pageImgHeight = (sourceHeight * imgWidth) / canvas.width;
-
-          // Add image to PDF, positioned at margin
-          pdf.addImage(
-            pageCanvas.toDataURL('image/png'), 
-            'PNG', 
-            margin, 
-            margin, 
-            pageImgWidth, 
-            pageImgHeight
-          );
+          const srcY  = page * availH * (canvas.height / imgH);
+          const srcH  = Math.min(availH * (canvas.height / imgH), canvas.height - srcY);
+          const pg    = document.createElement('canvas');
+          pg.width    = canvas.width;
+          pg.height   = srcH;
+          pg.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+          pdf.addImage(pg.toDataURL('image/png'), 'PNG', margin, margin, imgW, Math.min(availH, imgH - page * availH));
         }
-      } else {
-        // Single page - use full available width
-        pdf.addImage(
-          canvas.toDataURL('image/png'), 
-          'PNG', 
-          margin, 
-          margin, 
-          imgWidth, 
-          imgHeight
-        );
       }
 
       const className = marklistClass !== 'All Classes' ? marklistClass : 'All';
       const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
       pdf.save(`Class_Marklist_${className}_${timestamp}.pdf`);
-
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF. Please try again.');
     } finally {
       setDownloadingClass(false);
     }
-  }, [marklistStudents, marklistClass, printOrientation]);
+  }, [classRef, marklistStudents, marklistClass, printOrientation]);
 
 
   // Print individual report: capture with html2canvas (same pipeline as
