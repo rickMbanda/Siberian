@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -154,6 +156,9 @@ const Analytics = () => {
   const [termBterm, setTermBterm]         = useState('Term 2');
   const [termBexam, setTermBexam]         = useState('endterm');
 
+  const [downloadingSummary, setDownloadingSummary] = useState(false);
+  const summaryRef = useRef();
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -295,6 +300,53 @@ const Analytics = () => {
     return rows;
   }, [allResults, termAterm, termAexam, termBterm, termBexam]);
 
+  /* ── Download Summary PDF ───────────────────────────────────── */
+  const handleDownloadSummary = useCallback(async () => {
+    if (!summaryRef.current) return;
+    setDownloadingSummary(true);
+    try {
+      const canvas = await html2canvas(summaryRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: summaryRef.current.scrollWidth,
+        height: summaryRef.current.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: summaryRef.current.scrollWidth,
+        windowHeight: summaryRef.current.scrollHeight,
+      });
+      const pdf      = new jsPDF('p', 'mm', 'a4');
+      const margin   = 8;
+      const availW   = 210 - margin * 2;
+      const availH   = 297 - margin * 2;
+      const imgW     = availW;
+      const imgH     = (canvas.height * imgW) / canvas.width;
+      if (imgH <= availH) {
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, imgH);
+      } else {
+        const totalPages = Math.ceil(imgH / availH);
+        for (let page = 0; page < totalPages; page++) {
+          if (page > 0) pdf.addPage();
+          const srcY = page * availH * (canvas.height / imgH);
+          const srcH = Math.min(availH * (canvas.height / imgH), canvas.height - srcY);
+          const pg   = document.createElement('canvas');
+          pg.width   = canvas.width;
+          pg.height  = srcH;
+          pg.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+          pdf.addImage(pg.toDataURL('image/png'), 'PNG', margin, margin, imgW, Math.min(availH, imgH - page * availH));
+        }
+      }
+      pdf.save(`Analytics_Summary_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`);
+    } catch (err) {
+      console.error('Summary PDF error:', err);
+      alert('Could not generate PDF. Please try again.');
+    } finally {
+      setDownloadingSummary(false);
+    }
+  }, [summaryRef, selectedYear, selectedTerm, selectedExamType]);
+
   /* ── Summary stats for Class Comparison ─────────────────────── */
   const compStats = useMemo(() => {
     const valid = classComparison.means
@@ -345,6 +397,26 @@ const Analytics = () => {
                 {allResults.length} records loaded
               </span>
             )}
+            <button
+              onClick={handleDownloadSummary}
+              disabled={downloadingSummary || loading || allResults.length === 0}
+              style={{
+                marginLeft: 'auto',
+                padding: '8px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: (downloadingSummary || loading || allResults.length === 0) ? 'not-allowed' : 'pointer',
+                background: (downloadingSummary || loading || allResults.length === 0)
+                  ? '#e5e7eb' : 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                color: (downloadingSummary || loading || allResults.length === 0) ? '#9ca3af' : '#fff',
+                fontWeight: '700',
+                fontSize: '0.875rem',
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {downloadingSummary ? 'Generating PDF…' : '📥 Download Summary PDF'}
+            </button>
           </div>
         </div>
 
@@ -913,6 +985,176 @@ const Analytics = () => {
               )}
             </div>
           )}
+        </div>
+
+        {/* ── Hidden off-screen summary report for PDF capture ── */}
+        <div
+          ref={summaryRef}
+          style={{
+            position: 'fixed', left: '-9999px', top: 0,
+            width: '794px', background: '#fff',
+            fontFamily: '"Inter", "Segoe UI", sans-serif',
+            fontSize: '11px', color: '#1f2937',
+          }}
+        >
+          {/* Report header */}
+          <div style={{ background: 'linear-gradient(135deg, #0b3d91 0%, #1a56c4 100%)', padding: '24px 32px', color: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <img src="/logschool.png" alt="" style={{ width: '56px', height: '56px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+              <div>
+                <div style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.5px' }}>Spring Valley Baptist School</div>
+                <div style={{ fontSize: '13px', opacity: 0.85, marginTop: '2px' }}>Analytics Summary Report</div>
+              </div>
+              <div style={{ marginLeft: 'auto', textAlign: 'right', fontSize: '12px', opacity: 0.9 }}>
+                <div style={{ fontWeight: '700', fontSize: '14px' }}>{selectedTerm} · {EXAM_LABELS[selectedExamType]}</div>
+                <div>Academic Year {selectedYear}</div>
+                <div style={{ marginTop: '4px', opacity: 0.7 }}>Generated {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: '24px 32px' }}>
+            {/* Key stats row */}
+            <div style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
+              School Overview
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginBottom: '24px' }}>
+              {[
+                { label: 'School Average',    value: compStats ? compStats.school.toFixed(1) : '—' },
+                { label: 'Top Class',         value: compStats ? compStats.top : '—' },
+                { label: 'Needs Support',     value: compStats ? compStats.bottom : '—' },
+                { label: 'Students Assessed', value: filteredResults.filter(r => typeof r.mean === 'number').length },
+                { label: `At-Risk (< ${atRiskThreshold})`, value: atRiskList.length },
+              ].map(({ label, value }) => (
+                <div key={label} style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '10px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '18px', fontWeight: '700', color: '#0b3d91' }}>{value}</div>
+                  <div style={{ fontSize: '9px', color: '#6b7280', marginTop: '3px', fontWeight: '600' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Class performance table */}
+            <div style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
+              Class Performance
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px', fontSize: '11px' }}>
+              <thead>
+                <tr style={{ background: '#0b3d91', color: '#fff' }}>
+                  <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600' }}>Class</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'center', fontWeight: '600' }}>Mean Score</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600', width: '200px' }}>Score Bar</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600' }}>Performance Band</th>
+                </tr>
+              </thead>
+              <tbody>
+                {classComparison.labels.map((cls, i) => {
+                  const mean = classComparison.means[i];
+                  if (mean === null) return null;
+                  const { bg, text } = scoreColor(mean);
+                  const barColor = mean >= 80 ? '#22c55e' : mean >= 60 ? '#84cc16' : mean >= 40 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <tr key={cls} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                      <td style={{ padding: '6px 12px', fontWeight: '600', color: '#0b3d91', borderBottom: '1px solid #f3f4f6' }}>{cls}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid #f3f4f6' }}>
+                        <span style={{ background: bg, color: text, padding: '2px 10px', borderRadius: '12px', fontWeight: '700', fontSize: '11px' }}>
+                          {mean.toFixed(1)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '6px 12px', borderBottom: '1px solid #f3f4f6' }}>
+                        <div style={{ background: '#f3f4f6', borderRadius: '4px', height: '10px', width: '180px' }}>
+                          <div style={{ background: barColor, borderRadius: '4px', height: '10px', width: `${mean}%` }} />
+                        </div>
+                      </td>
+                      <td style={{ padding: '6px 12px', color: text, fontWeight: '500', borderBottom: '1px solid #f3f4f6' }}>{bandLabel(mean)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Subject analysis table */}
+            <div style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
+              Subject Analysis — Ranked Weakest to Strongest
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px', fontSize: '11px' }}>
+              <thead>
+                <tr style={{ background: '#0b3d91', color: '#fff' }}>
+                  <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600' }}>Rank</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600' }}>Subject</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'center', fontWeight: '600' }}>School Average</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600', width: '160px' }}>Score Bar</th>
+                  <th style={{ padding: '7px 12px', textAlign: 'center', fontWeight: '600' }}>Students</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subjectWeakness.map((s, i) => {
+                  const { bg, text } = scoreColor(s.avg);
+                  const barColor = s.avg >= 80 ? '#22c55e' : s.avg >= 60 ? '#84cc16' : s.avg >= 40 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <tr key={s.subj} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
+                      <td style={{ padding: '6px 12px', fontWeight: '700', color: i < 3 ? '#dc2626' : '#6b7280', borderBottom: '1px solid #f3f4f6' }}>{i + 1}</td>
+                      <td style={{ padding: '6px 12px', fontWeight: '600', borderBottom: '1px solid #f3f4f6' }}>{s.label}</td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid #f3f4f6' }}>
+                        <span style={{ background: bg, color: text, padding: '2px 10px', borderRadius: '12px', fontWeight: '700', fontSize: '11px' }}>
+                          {s.avg.toFixed(1)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '6px 12px', borderBottom: '1px solid #f3f4f6' }}>
+                        <div style={{ background: '#f3f4f6', borderRadius: '4px', height: '10px', width: '140px' }}>
+                          <div style={{ background: barColor, borderRadius: '4px', height: '10px', width: `${s.avg}%` }} />
+                        </div>
+                      </td>
+                      <td style={{ padding: '6px 12px', textAlign: 'center', color: '#6b7280', borderBottom: '1px solid #f3f4f6' }}>{s.count}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* At-risk summary */}
+            {atRiskList.length > 0 && (
+              <>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
+                  At-Risk Students (Mean &lt; {atRiskThreshold})
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '24px', fontSize: '11px' }}>
+                  <thead>
+                    <tr style={{ background: '#dc2626', color: '#fff' }}>
+                      <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600' }}>#</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600' }}>Student Name</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600' }}>Class</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'center', fontWeight: '600' }}>Mean</th>
+                      <th style={{ padding: '7px 12px', textAlign: 'left', fontWeight: '600' }}>Band</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {atRiskList.map((s, i) => {
+                      const { bg, text } = scoreColor(s.mean);
+                      return (
+                        <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fef2f2' }}>
+                          <td style={{ padding: '6px 12px', color: '#9ca3af', borderBottom: '1px solid #f3f4f6' }}>{i + 1}</td>
+                          <td style={{ padding: '6px 12px', fontWeight: '600', borderBottom: '1px solid #f3f4f6' }}>{s.name}</td>
+                          <td style={{ padding: '6px 12px', borderBottom: '1px solid #f3f4f6' }}>{s.cls}</td>
+                          <td style={{ padding: '6px 12px', textAlign: 'center', borderBottom: '1px solid #f3f4f6' }}>
+                            <span style={{ background: bg, color: text, padding: '2px 10px', borderRadius: '12px', fontWeight: '700' }}>
+                              {s.mean.toFixed(1)}
+                            </span>
+                          </td>
+                          <td style={{ padding: '6px 12px', color: text, fontWeight: '500', borderBottom: '1px solid #f3f4f6' }}>{bandLabel(s.mean)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </>
+            )}
+
+            {/* Footer */}
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: '9px' }}>
+              <span>Spring Valley Baptist School — Confidential Academic Report</span>
+              <span>Generated by the School Analytics System · {new Date().toLocaleString()}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
