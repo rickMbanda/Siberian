@@ -49,6 +49,7 @@ const Reports = () => {
   const [parentPin, setParentPin] = useState(null);
   const [pinLoading, setPinLoading] = useState(false);
   const [pinCopied, setPinCopied] = useState(false);
+  const [waPhone, setWaPhone] = useState('');
 
   // Load existing PIN whenever the selected student / term / exam changes.
   useEffect(() => {
@@ -1105,21 +1106,31 @@ const Reports = () => {
                 <p style={{ margin: '0 0 10px', fontSize: '0.82rem', fontWeight: '700', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Send Result Slip via WhatsApp
                 </p>
-                <button
-                  onClick={() => {
-                    const url = `${window.location.origin}/slip/${parentPin.pin}`;
-                    const studentName = selectedStudent?.name || 'your child';
-                    const msg = encodeURIComponent(
-                      `Hello! Here is the result slip for *${studentName}* from Spring Valley Baptist School:\n\n${url}\n\nThis link is secure and unique to your child.`
-                    );
-                    window.open(`https://wa.me/?text=${msg}`, '_blank');
-                  }}
-                  style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#25d366', color: '#fff', fontWeight: '700', fontSize: '0.875rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                >
-                  💬 Share on WhatsApp
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="tel"
+                    placeholder="Phone number (e.g. +254712345678)"
+                    value={waPhone}
+                    onChange={(e) => setWaPhone(e.target.value)}
+                    style={{ flex: '1', minWidth: '200px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.875rem', outline: 'none' }}
+                  />
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/slip/${parentPin.pin}`;
+                      const studentName = selectedStudent?.name || 'your child';
+                      const msg = encodeURIComponent(
+                        `Hello! Here is the result slip for *${studentName}* from Spring Valley Baptist School:\n\n${url}\n\nThis link is secure and unique to your child.`
+                      );
+                      const phone = waPhone.trim().replace(/[\s\-()]/g, '');
+                      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+                    }}
+                    style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#25d366', color: '#fff', fontWeight: '700', fontSize: '0.875rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    💬 Share on WhatsApp
+                  </button>
+                </div>
                 <p style={{ margin: '8px 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>
-                  Opens WhatsApp with a pre-written message — you choose who to send it to
+                  Enter the parent's number to open a direct WhatsApp chat, or leave blank to choose the contact in WhatsApp
                 </p>
               </div>
             </div>
