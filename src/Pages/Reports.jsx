@@ -947,91 +947,119 @@ const Reports = () => {
             <IndividualReport student={selectedStudent} classData={individualClassData} />
           </div>
         )}
-        {/* ── Actions toolbar ── */}
-        <div className="no-print" style={{ marginTop: '1.25em' }}>
+        {/* Print Options */}
+        <div className="no-print" style={{ margin: '1em 0', padding: '1.5em', backgroundColor: '#f8f9fa', borderRadius: '12px', border: '2px solid #e9ecef' }}>
+          <h4 style={{ margin: '0 0 1em 0', color: '#495057', fontWeight: '600' }}>📊 Excel-Style Print Options</h4>
 
-          {/* Orientation pill toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#6b7280', whiteSpace: 'nowrap' }}>Page orientation</span>
-            <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '3px', gap: '2px' }}>
-              {['portrait', 'landscape'].map(opt => (
-                <button
-                  key={opt}
-                  onClick={() => setPrintOrientation(opt)}
-                  style={{
-                    padding: '4px 14px', borderRadius: '6px', border: 'none', fontSize: '0.8rem',
-                    fontWeight: '600', cursor: 'pointer', transition: 'all 0.15s',
-                    background: printOrientation === opt ? '#fff' : 'transparent',
-                    color: printOrientation === opt ? '#0b3d91' : '#9ca3af',
-                    boxShadow: printOrientation === opt ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
-                  }}
-                >
-                  {opt === 'portrait' ? '▯ Portrait' : '▭ Landscape'}
-                </button>
-              ))}
+          <div style={{ display: 'flex', gap: '2em', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div>
+              <label style={{ fontWeight: 'bold', marginRight: '1em', color: '#495057' }}>Page Orientation:</label>
+              {marklistClass && ['Grade 5', 'Grade 6', 'Grade 7', 'Grade 8', 'Grade 9'].includes(marklistClass) && (
+                <div style={{ 
+                  marginTop: '0.5em', 
+                  padding: '0.5em', 
+                  backgroundColor: '#e3f2fd', 
+                  borderRadius: '5px',
+                  fontSize: '0.9em',
+                  color: '#1565c0'
+                }}>
+                  <strong>📐 Auto-selected:</strong> Landscape orientation for {marklistClass} (recommended for optimal layout)
+                </div>
+              )}
+              <div style={{ marginTop: '0.5em' }}>
+                <label style={{ display: 'block', marginBottom: '0.5em' }}>
+                  <input
+                    type="radio"
+                    value="portrait"
+                    checked={printOrientation === 'portrait'}
+                    onChange={(e) => setPrintOrientation(e.target.value)}
+                    style={{ marginRight: '0.5em' }}
+                  />
+                  Portrait (Recommended for smaller classes)
+                </label>
+                <label style={{ display: 'block' }}>
+                  <input
+                    type="radio"
+                    value="landscape"
+                    checked={printOrientation === 'landscape'}
+                    onChange={(e) => setPrintOrientation(e.target.value)}
+                    style={{ marginRight: '0.5em' }}
+                  />
+                  Landscape (Recommended for large marklists)
+                </label>
+              </div>
             </div>
           </div>
 
-          {/* Primary: Print + Download */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
-            <button
-              onClick={handlePrintIndividual}
-              disabled={!selectedStudent || printingIndividual}
-              style={{
-                flex: 1, padding: '11px 0', borderRadius: '10px', border: 'none', fontWeight: '700',
-                fontSize: '0.9rem', cursor: (!selectedStudent || printingIndividual) ? 'not-allowed' : 'pointer',
-                background: (!selectedStudent || printingIndividual) ? '#e5e7eb' : 'linear-gradient(135deg,#0b3d91,#1a56c4)',
-                color: (!selectedStudent || printingIndividual) ? '#9ca3af' : '#fff',
-                transition: 'all 0.2s',
-              }}
-            >
-              {printingIndividual ? 'Preparing…' : '🖨 Print Report'}
-            </button>
-            <button
-              onClick={handleDownloadIndividual}
-              disabled={!selectedStudent || downloadingIndividual}
-              style={{
-                flex: 1, padding: '11px 0', borderRadius: '10px', border: 'none', fontWeight: '700',
-                fontSize: '0.9rem', cursor: (!selectedStudent || downloadingIndividual) ? 'not-allowed' : 'pointer',
-                background: (!selectedStudent || downloadingIndividual) ? '#e5e7eb' : 'linear-gradient(135deg,#166534,#16a34a)',
-                color: (!selectedStudent || downloadingIndividual) ? '#9ca3af' : '#fff',
-                transition: 'all 0.2s',
-              }}
-            >
-              {downloadingIndividual ? 'Downloading…' : '📥 Download PDF'}
-            </button>
+          <div style={{ marginTop: '1em', padding: '0.8em', backgroundColor: '#d1ecf1', borderRadius: '8px', fontSize: '0.9em' }}>
+            <strong>💡 Tip:</strong> Use Landscape orientation for classes with many subjects or students. 
+            The system will automatically split large tables across multiple pages with proper headers on each page.
           </div>
-
-          {/* Secondary: Batch Print */}
-          <button
-            onClick={handleBatchPrint}
-            disabled={batchPrinting || selectedClass === 'All Classes' || batchStudents.length === 0}
-            title={selectedClass === 'All Classes' ? 'Pick a specific class above to enable batch printing' : `Print every student's report in ${selectedClass}`}
-            style={{
-              width: '100%', padding: '9px 0', borderRadius: '10px', fontWeight: '600',
-              fontSize: '0.875rem', cursor: (batchPrinting || selectedClass === 'All Classes' || batchStudents.length === 0) ? 'not-allowed' : 'pointer',
-              border: '2px solid',
-              borderColor: (batchPrinting || selectedClass === 'All Classes' || batchStudents.length === 0) ? '#e5e7eb' : '#6366f1',
-              background: 'transparent',
-              color: (batchPrinting || selectedClass === 'All Classes' || batchStudents.length === 0) ? '#d1d5db' : '#6366f1',
-              transition: 'all 0.2s',
-            }}
-          >
-            {batchPreparing
-              ? `Rendering ${batchStudents.length} reports…`
-              : batchPrinting
-                ? `Capturing ${batchStudents.length} reports…`
-                : `🖨 Batch Print${selectedClass !== 'All Classes' && batchStudents.length > 0 ? ` — ${selectedClass} (${batchStudents.length} students)` : ' All Reports'}`}
-          </button>
-
-          {batchPrinting && (
-            <div style={{ marginTop: '8px', padding: '8px 12px', background: '#eef2ff', border: '1px solid #c7d2fe', borderRadius: '8px', color: '#3730a3', fontSize: '0.875rem' }}>
-              {batchPreparing
-                ? <>Rendering <strong>{batchStudents.length}</strong> reports — please wait…</>
-                : <>Capturing reports — a print window will open when ready.</>}
-            </div>
-          )}
         </div>
+
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <button
+          onClick={handlePrintIndividual}
+          style={{
+            ...styles.button,
+            opacity: (!selectedStudent || printingIndividual) ? 0.6 : 1,
+            cursor: (!selectedStudent || printingIndividual) ? 'not-allowed' : 'pointer'
+          }}
+          disabled={!selectedStudent || printingIndividual}
+        >
+          {printingIndividual ? 'Preparing print…' : 'Print Individual Report'}
+        </button>
+        <button
+          onClick={handleDownloadIndividual}
+          style={{
+            ...styles.button,
+            backgroundColor: '#28a745',
+            opacity: downloadingIndividual ? 0.7 : 1,
+            cursor: downloadingIndividual ? 'wait' : (!selectedStudent ? 'not-allowed' : 'pointer')
+          }}
+          disabled={!selectedStudent || downloadingIndividual}
+        >
+          {downloadingIndividual ? 'Downloading...' : '📥 Download Individual Report (PDF)'}
+        </button>
+        <button
+          onClick={handleBatchPrint}
+          title={
+            selectedClass === 'All Classes'
+              ? 'Pick a specific class above to enable batch printing'
+              : `Print every student's report in ${selectedClass} in one go`
+          }
+          style={{
+            ...styles.button,
+            background: '#4169E1',
+            opacity: (batchPrinting || selectedClass === 'All Classes' || batchStudents.length === 0) ? 0.6 : 1,
+            cursor: batchPrinting
+              ? 'wait'
+              : (selectedClass === 'All Classes' || batchStudents.length === 0 ? 'not-allowed' : 'pointer')
+          }}
+          disabled={batchPrinting || selectedClass === 'All Classes' || batchStudents.length === 0}
+        >
+          {batchPreparing
+            ? `Rendering ${batchStudents.length} reports…`
+            : batchPrinting
+              ? `Capturing ${batchStudents.length} reports…`
+              : `🖨️ Batch Print All Reports${selectedClass !== 'All Classes' ? ` — ${selectedClass} (${batchStudents.length})` : ''}`}
+        </button>
+      </div>
+      {batchPrinting && (
+        <div className="no-print" style={{
+          marginTop: '0.8em',
+          padding: '0.7em 1em',
+          background: '#eef2ff',
+          border: '1px solid #c7d2fe',
+          borderRadius: '8px',
+          color: '#3730a3',
+          fontSize: '0.95em'
+        }}>
+          {batchPreparing
+            ? <>Rendering <strong>{batchStudents.length}</strong> student reports — this can take a few seconds for big classes…</>
+            : <>Capturing reports — a print window will open automatically when ready.</>}
+        </div>
+      )}
 
       {/* ── Parent PIN Management ── */}
       {selectedStudent && (
