@@ -318,101 +318,83 @@ const Reports = () => {
       return;
     }
 
-    // Mount the hidden batch container in the live tree so React renders all
-    // reports + Chart.js charts before we hand off to the browser print dialog.
+    // Mount the hidden off-screen container so React renders every report
+    // and Chart.js draws every chart before we capture them.
     setBatchPreparing(true);
     setBatchPrinting(true);
-    // Activate the single-page compact layout for every report in the batch.
-    document.body.classList.add('report-print-mode');
 
-    // Wait for React to commit + Chart.js to finish drawing every chart.
-    // Wait scales with the number of reports being rendered.
     await new Promise((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(resolve))
     );
+    // Scale wait time with class size so charts finish drawing.
     await new Promise((resolve) =>
-      setTimeout(resolve, 800 + batchStudents.length * 70)
+      setTimeout(resolve, 800 + batchStudents.length * 80)
     );
-
-    // Inject @media print rules that hide the live page and reveal only the
-    // batch container, with a page break between every student's report.
-    const existing = document.querySelectorAll('[data-batch-print-styles]');
-    existing.forEach((s) => s.remove());
-
-    const styleSheet = document.createElement('style');
-    styleSheet.setAttribute('data-batch-print-styles', 'true');
-    styleSheet.innerText = `
-      @media print {
-        body * { visibility: hidden !important; }
-        .batch-print-container,
-        .batch-print-container * { visibility: visible !important; }
-        .batch-print-container {
-          position: absolute !important;
-          left: 0 !important;
-          top: 0 !important;
-          width: 100% !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        }
-        .batch-print-page {
-          page-break-after: always;
-          break-after: page;
-        }
-        .batch-print-page:last-child {
-          page-break-after: auto;
-          break-after: auto;
-        }
-        .no-print { display: none !important; }
-        .batch-print-container button { display: none !important; }
-        nav, .exam-nav { display: none !important; }
-        table {
-          page-break-inside: auto !important;
-          width: 100% !important;
-        }
-        tr {
-          page-break-inside: avoid !important;
-          page-break-after: auto !important;
-        }
-        thead { display: table-header-group !important; }
-        tbody { display: table-row-group !important; }
-        img {
-          max-width: 100% !important;
-          height: auto !important;
-          page-break-inside: avoid !important;
-        }
-        .batch-print-container * {
-          -webkit-print-color-adjust: exact !important;
-          color-adjust: exact !important;
-        }
-        @page {
-          size: ${printOrientation === 'landscape' ? 'A4 landscape' : 'A4 portrait'};
-          margin: 0.5in;
-        }
-      }
-    `;
-    document.head.appendChild(styleSheet);
 
     setBatchPreparing(false);
 
-    const cleanup = () => {
-      if (styleSheet.parentNode) styleSheet.parentNode.removeChild(styleSheet);
-      document.body.classList.remove('report-print-mode');
+    try {
+      const pages = document.querySelectorAll('.batch-print-page');
+      if (pages.length === 0) {
+        alert('Could not find report pages to capture. Please try again.');
+        setBatchPrinting(false);
+        return;
+      }
+
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const margin         = 8;
+      const availableWidth  = 210 - margin * 2;
+      const availableHeight = 297 - margin * 2;
+
+      for (let i = 0; i < pages.length; i++) {
+        const page   = pages[i];
+        const canvas = await html2canvas(page, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          width: page.scrollWidth,
+          height: page.scrollHeight
+        });
+
+        const canvasAspect    = canvas.height / canvas.width;
+        const availableAspect = availableHeight / availableWidth;
+
+        let imgWidth, imgHeight;
+        if (canvasAspect > availableAspect) {
+          imgHeight = availableHeight;
+          imgWidth  = imgHeight / canvasAspect;
+        } else {
+          imgWidth  = availableWidth;
+          imgHeight = imgWidth * canvasAspect;
+        }
+
+        const xOffset = margin + (availableWidth - imgWidth) / 2;
+        if (i > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xOffset, margin, imgWidth, imgHeight);
+      }
+
+      // Open the multi-page PDF and trigger the browser print dialog.
+      const blob    = pdf.output('blob');
+      const blobUrl = URL.createObjectURL(blob);
+      const win     = window.open(blobUrl);
+      if (win) {
+        win.addEventListener('load', () => {
+          win.focus();
+          win.print();
+          win.addEventListener('afterprint', () => {
+            win.close();
+            URL.revokeObjectURL(blobUrl);
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Error generating batch print:', error);
+      alert('Error generating batch print. Please try again.');
+    } finally {
       setBatchPrinting(false);
-      window.removeEventListener('afterprint', cleanup);
-    };
-    window.addEventListener('afterprint', cleanup);
-
-    // Hand off to the browser's native print dialog. The user picks the
-    // printer and confirms; afterprint fires on close (whether printed or
-    // cancelled) and we restore the page.
-    window.print();
-
-    // Safety net: if afterprint never fires (rare in some browsers), still
-    // tear everything down so the page isn't left in print mode.
-    setTimeout(() => {
-      if (styleSheet.parentNode) cleanup();
-    }, 120000);
-  }, [selectedClass, batchStudents, printOrientation]);
+    }
+  }, [selectedClass, batchStudents]);
 
   const handleDownloadClass = useCallback(async () => {
     if (!classRef.current || marklistStudents.length === 0) return;
@@ -1198,9 +1180,9 @@ const Reports = () => {
           disabled={batchPrinting || selectedClass === 'All Classes' || batchStudents.length === 0}
         >
           {batchPreparing
-            ? `Preparing ${batchStudents.length} reports for print…`
+            ? `Rendering ${batchStudents.length} reports…`
             : batchPrinting
-              ? 'Print dialog open…'
+              ? `Capturing ${batchStudents.length} reports…`
               : `🖨️ Batch Print All Reports${selectedClass !== 'All Classes' ? ` — ${selectedClass} (${batchStudents.length})` : ''}`}
         </button>
       </div>
@@ -1216,7 +1198,7 @@ const Reports = () => {
         }}>
           {batchPreparing
             ? <>Rendering <strong>{batchStudents.length}</strong> student reports — this can take a few seconds for big classes…</>
-            : <>Print dialog should now be open. Pick your printer and confirm. Closing the dialog will return you to the page.</>}
+            : <>Capturing reports — a print window will open automatically when ready.</>}
         </div>
       )}
 
