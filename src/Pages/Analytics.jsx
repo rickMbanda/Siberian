@@ -6,6 +6,7 @@ import {
   BarElement,
   LineElement,
   PointElement,
+  Filler,
   Title,
   Tooltip,
   Legend,
@@ -14,7 +15,7 @@ import { Bar, Line } from 'react-chartjs-2';
 import ExamNavigation from '../Components/ExamNavigation';
 import { fetchResults } from '../api/results';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Filler, Title, Tooltip, Legend);
 
 const CLASSES = [
   'Playgroup', 'PP1', 'PP2', 'Grade 1', 'Grade 2', 'Grade 3',
@@ -48,6 +49,7 @@ const TABS = [
   { label: 'Student Progress',   icon: '👤' },
   { label: 'At-Risk Students',   icon: '⚠️' },
   { label: 'Subject Weakness',   icon: '🔍' },
+  { label: 'Term Comparison',    icon: '🔄' },
 ];
 
 const avg = (arr) => (arr.length === 0 ? null : arr.reduce((a, b) => a + b, 0) / arr.length);
@@ -143,9 +145,14 @@ const Analytics = () => {
   const [allResults, setAllResults]             = useState([]);
   const [loading, setLoading]                   = useState(true);
 
-  const [progClass, setProgClass]       = useState('Grade 1');
+  const [progClass, setProgClass]             = useState('Grade 1');
   const [selectedStudent, setSelectedStudent] = useState('');
   const [atRiskThreshold, setAtRiskThreshold] = useState(40);
+
+  const [termAterm, setTermAterm]         = useState('Term 1');
+  const [termAexam, setTermAexam]         = useState('endterm');
+  const [termBterm, setTermBterm]         = useState('Term 2');
+  const [termBexam, setTermBexam]         = useState('endterm');
 
   useEffect(() => {
     let cancelled = false;
@@ -266,6 +273,27 @@ const Analytics = () => {
       .filter((s) => s.avg !== null && s.count > 0)
       .sort((a, b) => a.avg - b.avg);
   }, [filteredResults]);
+
+  /* ── Tab 6: Term Comparison ──────────────────────────────────── */
+  const termComparison = useMemo(() => {
+    const sliceA = allResults.filter(
+      (r) => r.term === termAterm && r.examType === termAexam && r.examStatus !== 'absent' && typeof r.mean === 'number'
+    );
+    const sliceB = allResults.filter(
+      (r) => r.term === termBterm && r.examType === termBexam && r.examStatus !== 'absent' && typeof r.mean === 'number'
+    );
+    const byClassA = {};
+    const byClassB = {};
+    sliceA.forEach((r) => (byClassA[r.class] = byClassA[r.class] || []).push(r.mean));
+    sliceB.forEach((r) => (byClassB[r.class] = byClassB[r.class] || []).push(r.mean));
+    const rows = CLASSES.map((cls) => {
+      const a = byClassA[cls] ? avg(byClassA[cls]) : null;
+      const b = byClassB[cls] ? avg(byClassB[cls]) : null;
+      const delta = a !== null && b !== null ? b - a : null;
+      return { cls, a, b, delta };
+    }).filter((r) => r.a !== null || r.b !== null);
+    return rows;
+  }, [allResults, termAterm, termAexam, termBterm, termBexam]);
 
   /* ── Summary stats for Class Comparison ─────────────────────── */
   const compStats = useMemo(() => {
@@ -701,6 +729,179 @@ const Analytics = () => {
                               <td style={{ ...S.td, textAlign: 'center', color: '#6b7280' }}>{s.count}</td>
                               <td style={{ ...S.td, color: text, fontWeight: '500', fontSize: '0.85rem' }}>
                                 {bandLabel(s.avg)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ══ Tab 6: Term Comparison ══ */}
+          {activeTab === 6 && (
+            <div>
+              {/* Pickers for Term A and Term B */}
+              <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', marginBottom: '24px', alignItems: 'flex-end' }}>
+                <div>
+                  <p style={{ ...S.sectionTitle, margin: '0 0 12px 0' }}>Term Comparison — {selectedYear}</p>
+                  <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>
+                    Compare every class's mean between two exam sittings side-by-side.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  {/* Term A */}
+                  <div style={{ background: 'rgba(65,105,225,0.08)', border: '2px solid #4169E1', borderRadius: '12px', padding: '12px 16px' }}>
+                    <p style={{ margin: '0 0 8px 0', fontWeight: '700', color: '#4169E1', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Period A
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <div style={S.filterGroup}>
+                        <span style={S.filterLabel}>Term</span>
+                        <select style={S.select} value={termAterm} onChange={(e) => setTermAterm(e.target.value)}>
+                          {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div style={S.filterGroup}>
+                        <span style={S.filterLabel}>Exam</span>
+                        <select style={S.select} value={termAexam} onChange={(e) => setTermAexam(e.target.value)}>
+                          {EXAM_TYPES.map((et) => <option key={et} value={et}>{EXAM_LABELS[et]}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span style={{ fontSize: '1.5rem', color: '#9ca3af', alignSelf: 'center', paddingBottom: '4px' }}>→</span>
+
+                  {/* Term B */}
+                  <div style={{ background: 'rgba(245,158,11,0.08)', border: '2px solid #f59e0b', borderRadius: '12px', padding: '12px 16px' }}>
+                    <p style={{ margin: '0 0 8px 0', fontWeight: '700', color: '#d97706', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Period B
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <div style={S.filterGroup}>
+                        <span style={S.filterLabel}>Term</span>
+                        <select style={S.select} value={termBterm} onChange={(e) => setTermBterm(e.target.value)}>
+                          {TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div style={S.filterGroup}>
+                        <span style={S.filterLabel}>Exam</span>
+                        <select style={S.select} value={termBexam} onChange={(e) => setTermBexam(e.target.value)}>
+                          {EXAM_TYPES.map((et) => <option key={et} value={et}>{EXAM_LABELS[et]}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {termComparison.length === 0 ? (
+                <div style={S.empty}>No data found for the selected periods.</div>
+              ) : (
+                <>
+                  {/* Summary row */}
+                  {(() => {
+                    const improved = termComparison.filter((r) => r.delta !== null && r.delta > 0).length;
+                    const declined = termComparison.filter((r) => r.delta !== null && r.delta < 0).length;
+                    const unchanged = termComparison.filter((r) => r.delta !== null && Math.abs(r.delta) < 0.05).length;
+                    const avgDelta = avg(termComparison.filter((r) => r.delta !== null).map((r) => r.delta));
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '28px' }}>
+                        {[
+                          { label: 'Classes Improved',  value: improved,  color: '#15803d' },
+                          { label: 'Classes Declined',  value: declined,  color: '#dc2626' },
+                          { label: 'Unchanged',         value: unchanged, color: '#6b7280' },
+                          { label: 'Avg Score Change',  value: avgDelta !== null ? (avgDelta > 0 ? '+' : '') + avgDelta.toFixed(1) : '—', color: avgDelta > 0 ? '#15803d' : avgDelta < 0 ? '#dc2626' : '#6b7280' },
+                        ].map(({ label, value, color }) => (
+                          <div key={label} style={S.statCard}>
+                            <div style={{ ...S.statValue, color }}>{value}</div>
+                            <div style={S.statLabel}>{label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Grouped bar chart */}
+                  <Bar
+                    data={{
+                      labels: termComparison.map((r) => r.cls),
+                      datasets: [
+                        {
+                          label: `${termAterm} ${EXAM_LABELS[termAexam]} (A)`,
+                          data: termComparison.map((r) => r.a),
+                          backgroundColor: 'rgba(65,105,225,0.75)',
+                          borderColor: '#4169E1',
+                          borderWidth: 1,
+                          borderRadius: 4,
+                        },
+                        {
+                          label: `${termBterm} ${EXAM_LABELS[termBexam]} (B)`,
+                          data: termComparison.map((r) => r.b),
+                          backgroundColor: 'rgba(245,158,11,0.75)',
+                          borderColor: '#d97706',
+                          borderWidth: 1,
+                          borderRadius: 4,
+                        },
+                      ],
+                    }}
+                    options={{
+                      ...baseChartOptions,
+                      plugins: {
+                        legend: { display: true, labels: { font: { size: 12 }, color: '#374151' } },
+                        tooltip: {
+                          callbacks: {
+                            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1) ?? 'N/A'}`,
+                          },
+                        },
+                      },
+                    }}
+                  />
+
+                  {/* Delta table */}
+                  <div style={{ overflowX: 'auto', marginTop: '28px' }}>
+                    <table style={S.table}>
+                      <thead>
+                        <tr>
+                          <th style={S.th}>Class</th>
+                          <th style={{ ...S.th, textAlign: 'center' }}>
+                            Period A — {termAterm} {EXAM_LABELS[termAexam]}
+                          </th>
+                          <th style={{ ...S.th, textAlign: 'center' }}>
+                            Period B — {termBterm} {EXAM_LABELS[termBexam]}
+                          </th>
+                          <th style={{ ...S.th, textAlign: 'center' }}>Change</th>
+                          <th style={S.th}>Trend</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {termComparison.map((r, i) => {
+                          const { bg: bgA, text: textA } = scoreColor(r.a);
+                          const { bg: bgB, text: textB } = scoreColor(r.b);
+                          const deltaColor = r.delta === null ? '#9ca3af' : r.delta > 0 ? '#15803d' : r.delta < 0 ? '#dc2626' : '#6b7280';
+                          const trendIcon  = r.delta === null ? '—' : r.delta > 1 ? '↑ Improved' : r.delta < -1 ? '↓ Declined' : '→ Stable';
+                          return (
+                            <tr key={r.cls} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                              <td style={{ ...S.td, fontWeight: '700', color: '#0b3d91' }}>{r.cls}</td>
+                              <td style={{ ...S.td, textAlign: 'center' }}>
+                                {r.a !== null
+                                  ? <span style={{ background: bgA, color: textA, padding: '3px 12px', borderRadius: '20px', fontWeight: '700', fontSize: '0.875rem' }}>{r.a.toFixed(1)}</span>
+                                  : <span style={{ color: '#9ca3af' }}>—</span>}
+                              </td>
+                              <td style={{ ...S.td, textAlign: 'center' }}>
+                                {r.b !== null
+                                  ? <span style={{ background: bgB, color: textB, padding: '3px 12px', borderRadius: '20px', fontWeight: '700', fontSize: '0.875rem' }}>{r.b.toFixed(1)}</span>
+                                  : <span style={{ color: '#9ca3af' }}>—</span>}
+                              </td>
+                              <td style={{ ...S.td, textAlign: 'center', fontWeight: '700', color: deltaColor, fontSize: '1rem' }}>
+                                {r.delta !== null ? (r.delta > 0 ? '+' : '') + r.delta.toFixed(1) : '—'}
+                              </td>
+                              <td style={{ ...S.td, color: deltaColor, fontWeight: '600', fontSize: '0.875rem' }}>
+                                {trendIcon}
                               </td>
                             </tr>
                           );
