@@ -49,6 +49,7 @@ const Reports = () => {
   const [parentPin, setParentPin] = useState(null);
   const [pinLoading, setPinLoading] = useState(false);
   const [pinCopied, setPinCopied] = useState(false);
+  const [shareContact, setShareContact] = useState('');
 
   // Load existing PIN whenever the selected student / term / exam changes.
   useEffect(() => {
@@ -1068,34 +1069,102 @@ const Reports = () => {
             Generate a secure PIN so a parent can view this student's result slip without logging in.
           </p>
           {parentPin ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
-              <div style={{ padding: '8px 14px', background: '#fff', border: '1px solid #86efac', borderRadius: '8px', fontFamily: 'monospace', fontWeight: '700', fontSize: '1.1rem', letterSpacing: '3px', color: '#166534' }}>
-                {parentPin.pin}
+            <div>
+              {/* PIN display + action buttons */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '14px' }}>
+                <div style={{ padding: '8px 14px', background: '#fff', border: '1px solid #86efac', borderRadius: '8px', fontFamily: 'monospace', fontWeight: '700', fontSize: '1.1rem', letterSpacing: '3px', color: '#166534' }}>
+                  {parentPin.pin}
+                </div>
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}/slip/${parentPin.pin}`;
+                    navigator.clipboard.writeText(url).then(() => { setPinCopied(true); setTimeout(() => setPinCopied(false), 2000); });
+                  }}
+                  style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #4f8cff', background: '#4f8cff', color: '#fff', fontWeight: '600', fontSize: '0.875rem', cursor: 'pointer' }}
+                >
+                  {pinCopied ? '✅ Copied!' : '📋 Copy Link'}
+                </button>
+                <button
+                  disabled={pinLoading}
+                  onClick={async () => {
+                    setPinLoading(true);
+                    try { await revokeParentPin(parentPin.pin); setParentPin(null); setShareContact(''); }
+                    catch (e) { alert('Could not revoke PIN. Please try again.'); }
+                    finally { setPinLoading(false); }
+                  }}
+                  style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #ef4444', background: '#ef4444', color: '#fff', fontWeight: '600', fontSize: '0.875rem', cursor: pinLoading ? 'wait' : 'pointer', opacity: pinLoading ? 0.6 : 1 }}
+                >
+                  🗑 Revoke PIN
+                </button>
+                <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                  Expires: {parentPin.expiresAt ? new Date(parentPin.expiresAt).toLocaleDateString() : 'Never'}
+                </span>
               </div>
-              <button
-                onClick={() => {
-                  const url = `${window.location.origin}/slip/${parentPin.pin}`;
-                  navigator.clipboard.writeText(url).then(() => { setPinCopied(true); setTimeout(() => setPinCopied(false), 2000); });
-                }}
-                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #4f8cff', background: '#4f8cff', color: '#fff', fontWeight: '600', fontSize: '0.875rem', cursor: 'pointer' }}
-              >
-                {pinCopied ? '✅ Copied!' : '📋 Copy Link'}
-              </button>
-              <button
-                disabled={pinLoading}
-                onClick={async () => {
-                  setPinLoading(true);
-                  try { await revokeParentPin(parentPin.pin); setParentPin(null); }
-                  catch (e) { alert('Could not revoke PIN. Please try again.'); }
-                  finally { setPinLoading(false); }
-                }}
-                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #ef4444', background: '#ef4444', color: '#fff', fontWeight: '600', fontSize: '0.875rem', cursor: pinLoading ? 'wait' : 'pointer', opacity: pinLoading ? 0.6 : 1 }}
-              >
-                🗑 Revoke PIN
-              </button>
-              <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
-                Expires: {parentPin.expiresAt ? new Date(parentPin.expiresAt).toLocaleDateString() : 'Never'}
-              </span>
+
+              {/* Share panel */}
+              <div style={{ background: '#fff', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '14px 16px' }}>
+                <p style={{ margin: '0 0 10px', fontSize: '0.82rem', fontWeight: '700', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Send Result Slip Link
+                </p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="Parent email or phone (e.g. +254712345678)"
+                    value={shareContact}
+                    onChange={(e) => setShareContact(e.target.value)}
+                    style={{ flex: '1', minWidth: '220px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '0.875rem', outline: 'none' }}
+                  />
+                  {/* Email button — opens default email client */}
+                  <button
+                    disabled={!shareContact.trim()}
+                    onClick={() => {
+                      const url = `${window.location.origin}/slip/${parentPin.pin}`;
+                      const studentName = selectedStudent?.name || 'your child';
+                      const subject = encodeURIComponent(`Spring Valley Baptist School — Result Slip for ${studentName}`);
+                      const body = encodeURIComponent(
+                        `Dear Parent/Guardian,\n\nPlease find below the result slip for ${studentName}.\n\nResult Slip Link:\n${url}\n\nThis link is unique and secure. Please do not share it with others.\n\nRegards,\nSpring Valley Baptist School`
+                      );
+                      window.open(`mailto:${encodeURIComponent(shareContact.trim())}?subject=${subject}&body=${body}`);
+                    }}
+                    style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: shareContact.trim() ? 'linear-gradient(135deg,#1d4ed8,#2563eb)' : '#e5e7eb', color: shareContact.trim() ? '#fff' : '#9ca3af', fontWeight: '600', fontSize: '0.875rem', cursor: shareContact.trim() ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}
+                  >
+                    📧 Email
+                  </button>
+                  {/* WhatsApp button */}
+                  <button
+                    disabled={!shareContact.trim()}
+                    onClick={() => {
+                      const url = `${window.location.origin}/slip/${parentPin.pin}`;
+                      const studentName = selectedStudent?.name || 'your child';
+                      const phone = shareContact.trim().replace(/[\s\-()]/g, '');
+                      const msg = encodeURIComponent(
+                        `Hello! Here is the result slip for *${studentName}* from Spring Valley Baptist School:\n\n${url}\n\nThis link is secure and unique to your child.`
+                      );
+                      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+                    }}
+                    style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: shareContact.trim() ? '#25d366' : '#e5e7eb', color: shareContact.trim() ? '#fff' : '#9ca3af', fontWeight: '600', fontSize: '0.875rem', cursor: shareContact.trim() ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}
+                  >
+                    💬 WhatsApp
+                  </button>
+                  {/* SMS fallback */}
+                  <button
+                    disabled={!shareContact.trim()}
+                    onClick={() => {
+                      const url = `${window.location.origin}/slip/${parentPin.pin}`;
+                      const studentName = selectedStudent?.name || 'your child';
+                      const phone = shareContact.trim().replace(/[\s\-()]/g, '');
+                      const msg = encodeURIComponent(`Spring Valley Baptist School result slip for ${studentName}: ${url}`);
+                      window.open(`sms:${phone}?body=${msg}`);
+                    }}
+                    style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: shareContact.trim() ? '#6d28d9' : '#e5e7eb', color: shareContact.trim() ? '#fff' : '#9ca3af', fontWeight: '600', fontSize: '0.875rem', cursor: shareContact.trim() ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}
+                  >
+                    📱 SMS
+                  </button>
+                </div>
+                <p style={{ margin: '8px 0 0', fontSize: '0.75rem', color: '#9ca3af' }}>
+                  Email opens your mail client · WhatsApp/SMS open on your device · no data is sent by the server
+                </p>
+              </div>
             </div>
           ) : (
             <button
