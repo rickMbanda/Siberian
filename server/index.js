@@ -12,7 +12,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const mongoURI ='mongodb+srv://mbandaderrick309:Quicksilver20088@cluster0.q0tykxp.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const mongoURI = process.env.MONGODB_URI;
 
 if (!mongoURI) {
   console.error('ERROR: MONGODB_URI environment variable is required');
