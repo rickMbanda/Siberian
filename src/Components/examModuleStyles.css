@@ -1,0 +1,90 @@
+.exam-module-container {
+  max-width: 800px;
+  margin: 3em auto;
+  padding: 2.5em 2em;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.10), 0 1.5px 6px rgba(0,0,0,0.08);
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.exam-module-container h1 {
+  font-size: 2em;
+  color: #2355d6;
+  margin-bottom: 1.2em;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.data-entry-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 2em;
+  background: #f8fafc;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.data-entry-grid-table th, .data-entry-grid-table td {
+  padding: 0.9em 0.7em;
+  text-align: center;
+  border-bottom: 1px solid #e0e7ff;
+  font-size: 1.05em;
+}
+
+.data-entry-grid-table th {
+  background: #e0e7ff;
+  color: #2d3a4a;
+  font-weight: 600;
+}
+
+.data-entry-grid-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-entry-input {
+  width: 90%;
+  padding: 0.5em;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  font-size: 1em;
+  background: #fff;
+  transition: border 0.2s;
+}
+
+.data-entry-input:focus {
+  border: 1.5px solid #2355d6;
+  outline: none;
+  background: #e0e7ff;
+}
+
+.add-student-btn {
+  background: linear-gradient(90deg, #4f8cff 0%, #2355d6 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.9em 1.5em;
+  font-size: 1.1em;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 1em;
+  box-shadow: 0 2px 8px rgba(79,140,255,0.08);
+  transition: background 0.2s, transform 0.2s;
+}
+
+.add-student-btn:hover,
+.add-student-btn:focus {
+  background: linear-gradient(90deg, #2355d6 0%, #4f8cff 100%);
+  transform: translateY(-2px) scale(1.03);
+  outline: none;
+}
+
+@media (max-width: 900px) {
+  .exam-module-container {
+    padding: 1em 0.5em;
+  }
+  .data-entry-grid-table th, .data-entry-grid-table td {
+    padding: 0.6em 0.3em;
+    font-size: 0.98em;
+  }
+}

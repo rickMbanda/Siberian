@@ -1,0 +1,37 @@
+[1G[0K⠙[1G[0K
+> phoenix@0.1.0 start
+> react-scripts start
+
+[1G[0K⠙[1G[0K[36mAttempting to bind to HOST environment variable: [33m[1m0.0.0.0[22m[39m[36m[39m
+If this was unintentional, check that you haven't mistakenly set it in your shell.
+Learn more here: [33mhttps://cra.link/advanced-config[39m
+
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+(node:150) [DEP_WEBPACK_DEV_SERVER_ON_AFTER_SETUP_MIDDLEWARE] DeprecationWarning: 'onAfterSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:150) [DEP_WEBPACK_DEV_SERVER_ON_BEFORE_SETUP_MIDDLEWARE] DeprecationWarning: 'onBeforeSetupMiddleware' option is deprecated. Please use the 'setupMiddlewares' option.
+/home/runner/workspace/node_modules/webpack-dev-server/lib/Server.js:2557
+        throw error;
+        ^
+
+Error: listen EADDRINUSE: address already in use 0.0.0.0:5000
+[90m    at Server.setupListenHandle [as _listen2] (node:net:1908:16)[39m
+[90m    at listenInCluster (node:net:1965:12)[39m
+[90m    at doListen (node:net:2139:7)[39m
+[90m    at process.processTicksAndRejections (node:internal/process/task_queues:83:21)[39m {
+  code: [32m'EADDRINUSE'[39m,
+  errno: [33m-98[39m,
+  syscall: [32m'listen'[39m,
+  address: [32m'0.0.0.0'[39m,
+  port: [33m5000[39m
+}
+
+Node.js v20.20.0
+[1G[0K⠙[1G[0K[1mnpm[22m [96mnotice[39m
+[1mnpm[22m [96mnotice[39m New [31mmajor[39m version of npm available! [31m10.8.2[39m -> [34m11.13.0[39m
+[1mnpm[22m [96mnotice[39m Changelog: [34mhttps://github.com/npm/cli/releases/tag/v11.13.0[39m
+[1mnpm[22m [96mnotice[39m To update run: [4mnpm install -g npm@11.13.0[24m
+[1mnpm[22m [96mnotice[39m
+[1G[0K⠙[1G[0K

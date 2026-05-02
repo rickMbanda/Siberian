@@ -1,0 +1,168 @@
+
+.exam-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2em;
+}
+
+.exam-nav-title {
+  color: #2d3a4a;
+  margin-bottom: 1em;
+  font-size: 1.5em;
+  text-align: center;
+}
+
+.nav-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1.2em;
+  flex-wrap: wrap;
+}
+
+.nav-button {
+  background: #000080;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7em 1.3em;
+  font-size: 1.05em;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 80, 0.15);
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.nav-button:hover,
+.nav-button:focus {
+  background: #000066;
+  transform: translateY(-2px) scale(1.03);
+  outline: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 80, 0.25);
+}
+
+.nav-button.active {
+  background: #000066;
+  box-shadow: 0 4px 12px rgba(0, 0, 80, 0.25);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .nav-buttons {
+    gap: 0.8em;
+  }
+  
+  .nav-button {
+    padding: 0.6em 1em;
+    font-size: 0.95em;
+  }
+}
+
+/* ── Exam Type dropdown (replaces individual Opener/Midterm/Endterm buttons) ── */
+.exam-type-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.exam-type-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  background: #000080;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 0.7em 1.4em;
+  font-size: 1.05em;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 80, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.exam-type-button:hover,
+.exam-type-button:focus {
+  background: #000066;
+  box-shadow: 0 6px 18px rgba(0, 0, 80, 0.45);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.exam-type-button.active,
+.exam-type-button.open {
+  background: #000066;
+  box-shadow: 0 6px 20px rgba(0, 0, 80, 0.5);
+}
+
+.exam-type-icon {
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.15));
+}
+
+.exam-type-label {
+  white-space: nowrap;
+}
+
+.exam-type-chevron {
+  font-size: 0.65em;
+  margin-left: 0.2em;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+
+.exam-type-chevron.open {
+  transform: rotate(180deg);
+}
+
+.exam-type-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 180px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  padding: 6px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid #e5e7eb;
+}
+
+.exam-type-menu-item {
+  display: block;
+  padding: 10px 16px;
+  border-radius: 8px;
+  color: #374151;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.98em;
+  transition: background 0.15s, color 0.15s;
+}
+
+.exam-type-menu-item:hover,
+.exam-type-menu-item:focus {
+  background: linear-gradient(135deg, #eef2ff 0%, #ede9fe 100%);
+  color: #4f46e5;
+  outline: none;
+}
+
+.exam-type-menu-item.active {
+  background: #000080;
+  color: #fff;
+}
+
+.exam-type-menu-item.active:hover {
+  background: #000066;
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .exam-type-button {
+    padding: 0.6em 1.1em;
+    font-size: 0.95em;
+  }
+}
