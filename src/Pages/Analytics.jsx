@@ -714,7 +714,7 @@ const Analytics = () => {
 
           {/* ══ Tab 3: Student Progress ══ */}
           {activeTab === 3 && (
-            <div ref={studentProgRef}>
+            <div>
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
                   <p style={{ ...S.sectionTitle, margin: 0 }}>Student Performance Throughout {selectedYear}</p>
@@ -780,6 +780,7 @@ const Analytics = () => {
                 </div>
               </div>
 
+              <div ref={studentProgRef}>
               {!selectedStudent && (
                 <div style={S.empty}>
                   {filteredStudents.length === 0 && (studentSearch || progStudentClass)
@@ -843,6 +844,7 @@ const Analytics = () => {
                   )}
                 </>
               )}
+              </div>
             </div>
           )}
 
