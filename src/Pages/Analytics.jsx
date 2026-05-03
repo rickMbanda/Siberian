@@ -287,6 +287,28 @@ const Analytics = () => {
     return { labels, values, name: studentName };
   }, [allResults, selectedStudent, uniqueStudents]);
 
+  const studentSubjectBreakdown = useMemo(() => {
+    if (!selectedStudent) return null;
+    const rows = allResults.filter(
+      (r) => (r.studentRecordId || r.name) === selectedStudent
+    );
+    if (rows.length === 0) return null;
+    const cols = [];
+    TERMS.forEach((term) => {
+      EXAM_TYPES.forEach((et) => {
+        const row = rows.find((r) => r.term === term && r.examType === et) || null;
+        cols.push({ key: `${term}_${et}`, label: `${term.replace('Term ', 'T')} ${EXAM_LABELS[et]}`, row });
+      });
+    });
+    const hasAnyCol = cols.some((c) => c.row !== null);
+    if (!hasAnyCol) return null;
+    const activeSubjects = Object.keys(SUBJECTS).filter((subj) =>
+      cols.some((c) => c.row && typeof c.row[subj] === 'number')
+    );
+    if (activeSubjects.length === 0) return null;
+    return { cols, activeSubjects };
+  }, [allResults, selectedStudent]);
+
   /* ── Tab 4: At-Risk Students ─────────────────────────────────── */
   const atRiskList = useMemo(() =>
     filteredResults
@@ -840,6 +862,79 @@ const Analytics = () => {
                           },
                         }}
                       />
+
+                      {/* Subject breakdown table */}
+                      {studentSubjectBreakdown && (
+                        <div style={{ marginTop: '32px' }}>
+                          <p style={{ ...S.sectionTitle, marginBottom: '12px', fontSize: '1rem' }}>
+                            Subject Scores Breakdown — {studentProgress.name}
+                          </p>
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ ...S.table, fontSize: '0.8rem' }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ ...S.th, minWidth: '100px', position: 'sticky', left: 0, zIndex: 1 }}>Subject</th>
+                                  {studentSubjectBreakdown.cols.map((c) => (
+                                    <th key={c.key} style={{ ...S.th, textAlign: 'center', minWidth: '72px', whiteSpace: 'nowrap' }}>
+                                      {c.label}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {studentSubjectBreakdown.activeSubjects.map((subj, si) => (
+                                  <tr key={subj} style={{ background: si % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                    <td style={{ ...S.td, fontWeight: '600', color: '#374151', position: 'sticky', left: 0, background: si % 2 === 0 ? '#fff' : '#fafafa', zIndex: 1 }}>
+                                      {SUBJECTS[subj]}
+                                    </td>
+                                    {studentSubjectBreakdown.cols.map((c) => {
+                                      const score = c.row && typeof c.row[subj] === 'number' ? c.row[subj] : null;
+                                      const { bg, text } = scoreColor(score);
+                                      return (
+                                        <td key={c.key} style={{ ...S.td, textAlign: 'center', background: score !== null ? bg : undefined }}>
+                                          {score !== null
+                                            ? <span style={{ color: text, fontWeight: '700' }}>{score.toFixed(1)}</span>
+                                            : <span style={{ color: '#d1d5db' }}>—</span>}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                                {/* Mean row */}
+                                <tr style={{ background: '#f0f4ff', borderTop: '2px solid #c7d2fe' }}>
+                                  <td style={{ ...S.td, fontWeight: '700', color: '#0b3d91', position: 'sticky', left: 0, background: '#f0f4ff', zIndex: 1 }}>
+                                    Mean
+                                  </td>
+                                  {studentSubjectBreakdown.cols.map((c) => {
+                                    const mean = c.row && typeof c.row.mean === 'number' ? c.row.mean : null;
+                                    const { bg, text } = scoreColor(mean);
+                                    return (
+                                      <td key={c.key} style={{ ...S.td, textAlign: 'center', background: mean !== null ? bg : undefined }}>
+                                        {mean !== null
+                                          ? <span style={{ color: text, fontWeight: '700', fontSize: '0.85rem' }}>{mean.toFixed(1)}</span>
+                                          : <span style={{ color: '#d1d5db' }}>—</span>}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                          {/* Colour legend */}
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
+                            {[
+                              { bg: '#dcfce7', text: '#15803d', label: '≥ 80  Exceeds' },
+                              { bg: '#d9f99d', text: '#4d7c0f', label: '60–79  Meets' },
+                              { bg: '#fef3c7', text: '#92400e', label: '40–59  Approaching' },
+                              { bg: '#fee2e2', text: '#991b1b', label: '< 40  Below' },
+                            ].map(({ bg, text, label }) => (
+                              <span key={label} style={{ background: bg, color: text, padding: '3px 10px', borderRadius: '6px', fontSize: '0.72rem', fontWeight: '600' }}>
+                                {label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </>
