@@ -148,9 +148,11 @@ const Analytics = () => {
   const [allResults, setAllResults]             = useState([]);
   const [loading, setLoading]                   = useState(true);
 
-  const [progClass, setProgClass]             = useState('Grade 1');
-  const [selectedStudent, setSelectedStudent] = useState('');
-  const [atRiskThreshold, setAtRiskThreshold] = useState(40);
+  const [progClass, setProgClass]               = useState('Grade 1');
+  const [selectedStudent, setSelectedStudent]   = useState('');
+  const [progStudentClass, setProgStudentClass] = useState('');
+  const [studentSearch, setStudentSearch]       = useState('');
+  const [atRiskThreshold, setAtRiskThreshold]   = useState(40);
 
   const [termAterm, setTermAterm]         = useState('Term 1');
   const [termAexam, setTermAexam]         = useState('endterm');
@@ -256,6 +258,16 @@ const Analytics = () => {
       .map((r) => ({ id: r.studentRecordId || r.name, name: r.name, cls: r.class }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [allResults]);
+
+  const filteredStudents = useMemo(() => {
+    let list = uniqueStudents;
+    if (progStudentClass) list = list.filter((s) => s.cls === progStudentClass);
+    if (studentSearch.trim()) {
+      const q = studentSearch.trim().toLowerCase();
+      list = list.filter((s) => s.name.toLowerCase().includes(q));
+    }
+    return list;
+  }, [uniqueStudents, progStudentClass, studentSearch]);
 
   const studentProgress = useMemo(() => {
     if (!selectedStudent) return null;
@@ -703,28 +715,77 @@ const Analytics = () => {
           {/* ══ Tab 3: Student Progress ══ */}
           {activeTab === 3 && (
             <div ref={studentProgRef}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                <p style={{ ...S.sectionTitle, margin: 0 }}>Student Performance Throughout {selectedYear}</p>
-                <div style={S.filterGroup}>
-                  <span style={S.filterLabel}>Student</span>
-                  <select
-                    style={{ ...S.select, minWidth: '240px' }}
-                    value={selectedStudent}
-                    onChange={(e) => setSelectedStudent(e.target.value)}
-                  >
-                    <option value="">— Select a student —</option>
-                    {uniqueStudents.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.cls})</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ marginLeft: 'auto' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '14px' }}>
+                  <p style={{ ...S.sectionTitle, margin: 0 }}>Student Performance Throughout {selectedYear}</p>
                   {dlBtn('studentProg', studentProgRef, `Student_Progress_${selectedStudent ? uniqueStudents.find(s => s.id === selectedStudent)?.name : 'Unknown'}_${selectedYear}.pdf`, !selectedStudent || !studentProgress || studentProgress.values.every(v => v === null))}
+                </div>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  {/* Class filter */}
+                  <div style={S.filterGroup}>
+                    <span style={S.filterLabel}>Class</span>
+                    <select
+                      style={S.select}
+                      value={progStudentClass}
+                      onChange={(e) => { setProgStudentClass(e.target.value); setSelectedStudent(''); setStudentSearch(''); }}
+                    >
+                      <option value="">All Classes</option>
+                      {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  {/* Search */}
+                  <div style={S.filterGroup}>
+                    <span style={S.filterLabel}>Search student</span>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ position: 'absolute', left: '10px', color: '#9ca3af', fontSize: '0.9rem', pointerEvents: 'none' }}>🔍</span>
+                      <input
+                        type="text"
+                        placeholder="Type a name…"
+                        value={studentSearch}
+                        onChange={(e) => { setStudentSearch(e.target.value); setSelectedStudent(''); }}
+                        style={{
+                          ...S.select, paddingLeft: '30px', minWidth: '180px',
+                          outline: 'none',
+                        }}
+                      />
+                      {studentSearch && (
+                        <button
+                          onClick={() => { setStudentSearch(''); setSelectedStudent(''); }}
+                          style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '0.9rem', lineHeight: 1 }}
+                        >✕</button>
+                      )}
+                    </div>
+                  </div>
+                  {/* Student picker */}
+                  <div style={S.filterGroup}>
+                    <span style={S.filterLabel}>
+                      Student {filteredStudents.length > 0 ? `(${filteredStudents.length} found)` : ''}
+                    </span>
+                    <select
+                      style={{ ...S.select, minWidth: '220px' }}
+                      value={selectedStudent}
+                      onChange={(e) => setSelectedStudent(e.target.value)}
+                    >
+                      <option value="">— Select a student —</option>
+                      {filteredStudents.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}{!progStudentClass ? ` (${s.cls})` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {filteredStudents.length === 0 && (studentSearch || progStudentClass) && (
+                    <span style={{ fontSize: '0.82rem', color: '#ef4444', alignSelf: 'flex-end', paddingBottom: '8px' }}>
+                      No students match the current filters.
+                    </span>
+                  )}
                 </div>
               </div>
 
               {!selectedStudent && (
-                <div style={S.empty}>Select a student above to view their progress chart.</div>
+                <div style={S.empty}>
+                  {filteredStudents.length === 0 && (studentSearch || progStudentClass)
+                    ? 'No students match the current filters.'
+                    : 'Select a student above to view their progress chart.'}
+                </div>
               )}
 
               {selectedStudent && studentProgress && (
