@@ -158,7 +158,15 @@ const Analytics = () => {
   const [termBexam, setTermBexam]         = useState('endterm');
 
   const [downloadingSummary, setDownloadingSummary] = useState(false);
-  const summaryRef = useRef();
+  const [downloadingModule, setDownloadingModule] = useState(null);
+  const summaryRef     = useRef();
+  const classCompRef   = useRef();
+  const heatMapRef     = useRef();
+  const classProgRef   = useRef();
+  const studentProgRef = useRef();
+  const atRiskRef      = useRef();
+  const subjectWeakRef = useRef();
+  const termCompRef    = useRef();
 
   const [schoolTarget, setSchoolTarget] = useState(null);
   useEffect(() => {
@@ -357,6 +365,71 @@ const Analytics = () => {
     }
   }, [summaryRef, selectedYear, selectedTerm, selectedExamType]);
 
+  /* ── Download Individual Module PDF ─────────────────────────── */
+  const downloadModulePDF = useCallback(async (ref, moduleKey, filename) => {
+    if (!ref.current) return;
+    setDownloadingModule(moduleKey);
+    try {
+      const canvas = await html2canvas(ref.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: ref.current.scrollWidth,
+        height: ref.current.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: ref.current.scrollWidth,
+        windowHeight: ref.current.scrollHeight,
+      });
+      const pdf    = new jsPDF('p', 'mm', 'a4');
+      const margin = 8;
+      const availW = 210 - margin * 2;
+      const availH = 297 - margin * 2;
+      const imgW   = availW;
+      const imgH   = (canvas.height * imgW) / canvas.width;
+      if (imgH <= availH) {
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, imgW, imgH);
+      } else {
+        const totalPages = Math.ceil(imgH / availH);
+        for (let page = 0; page < totalPages; page++) {
+          if (page > 0) pdf.addPage();
+          const srcY = page * availH * (canvas.height / imgH);
+          const srcH = Math.min(availH * (canvas.height / imgH), canvas.height - srcY);
+          const pg   = document.createElement('canvas');
+          pg.width   = canvas.width;
+          pg.height  = srcH;
+          pg.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+          pdf.addImage(pg.toDataURL('image/png'), 'PNG', margin, margin, imgW, Math.min(availH, imgH - page * availH));
+        }
+      }
+      pdf.save(filename);
+    } catch (err) {
+      console.error('Module PDF error:', err);
+      alert('Could not generate PDF. Please try again.');
+    } finally {
+      setDownloadingModule(null);
+    }
+  }, []);
+
+  const dlBtn = (moduleKey, ref, filename, disabled = false) => (
+    <button
+      onClick={() => downloadModulePDF(ref, moduleKey, filename)}
+      disabled={disabled || downloadingModule !== null}
+      style={{
+        padding: '6px 16px', borderRadius: '8px', border: 'none', flexShrink: 0,
+        cursor: (disabled || downloadingModule !== null) ? 'not-allowed' : 'pointer',
+        background: (disabled || downloadingModule !== null)
+          ? '#e5e7eb' : 'linear-gradient(135deg, #4169E1 0%, #1a3a8f 100%)',
+        color: (disabled || downloadingModule !== null) ? '#9ca3af' : '#fff',
+        fontWeight: '700', fontSize: '0.78rem', whiteSpace: 'nowrap',
+        transition: 'all 0.2s',
+      }}
+    >
+      {downloadingModule === moduleKey ? 'Generating…' : '📥 Download PDF'}
+    </button>
+  );
+
   /* ── Summary stats for Class Comparison ─────────────────────── */
   const compStats = useMemo(() => {
     const valid = classComparison.means
@@ -442,10 +515,13 @@ const Analytics = () => {
 
           {/* ══ Tab 0: Class Comparison ══ */}
           {activeTab === 0 && (
-            <div>
-              <p style={S.sectionTitle}>
-                Class Mean Scores — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
-              </p>
+            <div ref={classCompRef}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+                <p style={{ ...S.sectionTitle, margin: 0 }}>
+                  Class Mean Scores — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+                </p>
+                {dlBtn('classComp', classCompRef, `Class_Comparison_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, !compStats)}
+              </div>
 
               {compStats ? (
                 <>
@@ -515,10 +591,13 @@ const Analytics = () => {
 
           {/* ══ Tab 1: Subject Heat Map ══ */}
           {activeTab === 1 && (
-            <div>
-              <p style={S.sectionTitle}>
-                Subject Performance Heat Map — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
-              </p>
+            <div ref={heatMapRef}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+                <p style={{ ...S.sectionTitle, margin: 0 }}>
+                  Subject Performance Heat Map — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+                </p>
+                {dlBtn('heatMap', heatMapRef, `Subject_Heat_Map_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, heatMap.activeSubjects.length === 0)}
+              </div>
               {heatMap.activeSubjects.length === 0 ? (
                 <div style={S.empty}>No subject data for the selected filters.</div>
               ) : (
@@ -578,7 +657,7 @@ const Analytics = () => {
 
           {/* ══ Tab 2: Class Progression ══ */}
           {activeTab === 2 && (
-            <div>
+            <div ref={classProgRef}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '20px' }}>
                 <p style={{ ...S.sectionTitle, margin: 0 }}>Class Mean Progression Throughout {selectedYear}</p>
                 <div style={S.filterGroup}>
@@ -586,6 +665,9 @@ const Analytics = () => {
                   <select style={S.select} value={progClass} onChange={(e) => setProgClass(e.target.value)}>
                     {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
+                </div>
+                <div style={{ marginLeft: 'auto' }}>
+                  {dlBtn('classProg', classProgRef, `Class_Progression_${progClass}_${selectedYear}.pdf`, classProgression.values.every(v => v === null))}
                 </div>
               </div>
               {classProgression.values.every((v) => v === null) ? (
@@ -620,7 +702,7 @@ const Analytics = () => {
 
           {/* ══ Tab 3: Student Progress ══ */}
           {activeTab === 3 && (
-            <div>
+            <div ref={studentProgRef}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '20px' }}>
                 <p style={{ ...S.sectionTitle, margin: 0 }}>Student Performance Throughout {selectedYear}</p>
                 <div style={S.filterGroup}>
@@ -635,6 +717,9 @@ const Analytics = () => {
                       <option key={s.id} value={s.id}>{s.name} ({s.cls})</option>
                     ))}
                   </select>
+                </div>
+                <div style={{ marginLeft: 'auto' }}>
+                  {dlBtn('studentProg', studentProgRef, `Student_Progress_${selectedStudent ? uniqueStudents.find(s => s.id === selectedStudent)?.name : 'Unknown'}_${selectedYear}.pdf`, !selectedStudent || !studentProgress || studentProgress.values.every(v => v === null))}
                 </div>
               </div>
 
@@ -702,7 +787,7 @@ const Analytics = () => {
 
           {/* ══ Tab 4: At-Risk Students ══ */}
           {activeTab === 4 && (
-            <div>
+            <div ref={atRiskRef}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', marginBottom: '20px' }}>
                 <p style={{ ...S.sectionTitle, margin: 0 }}>
                   At-Risk Students — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
@@ -720,6 +805,9 @@ const Analytics = () => {
                       {atRiskThreshold}
                     </span>
                   </div>
+                </div>
+                <div style={{ marginLeft: 'auto' }}>
+                  {dlBtn('atRisk', atRiskRef, `At_Risk_Students_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, atRiskList.length === 0)}
                 </div>
               </div>
 
@@ -773,10 +861,13 @@ const Analytics = () => {
 
           {/* ══ Tab 5: Subject Weakness Report ══ */}
           {activeTab === 5 && (
-            <div>
-              <p style={S.sectionTitle}>
-                Subject Weakness Report — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
-              </p>
+            <div ref={subjectWeakRef}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                <p style={{ ...S.sectionTitle, margin: 0 }}>
+                  Subject Weakness Report — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+                </p>
+                {dlBtn('subjectWeak', subjectWeakRef, `Subject_Weakness_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, subjectWeakness.length === 0)}
+              </div>
               <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '20px' }}>
                 Subjects ranked weakest to strongest across the whole school. Top 3 in red need the most attention.
               </p>
@@ -849,11 +940,14 @@ const Analytics = () => {
 
           {/* ══ Tab 6: Term Comparison ══ */}
           {activeTab === 6 && (
-            <div>
+            <div ref={termCompRef}>
               {/* Pickers for Term A and Term B */}
               <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', marginBottom: '24px', alignItems: 'flex-end' }}>
                 <div>
-                  <p style={{ ...S.sectionTitle, margin: '0 0 12px 0' }}>Term Comparison — {selectedYear}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <p style={{ ...S.sectionTitle, margin: 0 }}>Term Comparison — {selectedYear}</p>
+                    {dlBtn('termComp', termCompRef, `Term_Comparison_${selectedYear}.pdf`, termComparison.length === 0)}
+                  </div>
                   <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>
                     Compare every class's mean between two exam sittings side-by-side.
                   </p>
