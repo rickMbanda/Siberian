@@ -213,16 +213,17 @@ const UserManagement = () => {
                   <option value="">— None —</option>
                   {classes.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                {form.role === 'teacher' && (
-                  <>
-                    <label style={styles.label}>Allowed Exam Type</label>
-                    <select style={styles.select} value={form.allowedExamType} onChange={e => setForm({ ...form, allowedExamType: e.target.value })}>
+                <label style={styles.label}>Allowed Exam Type</label>
+                <select style={styles.select} value={form.allowedExamType} onChange={e => setForm({ ...form, allowedExamType: e.target.value })}>
+                  {form.role === 'admin' && <option value="all">All</option>}
+                  {form.role === 'teacher' && (
+                    <>
                       <option value="opener">Opener</option>
                       <option value="midterm">Midterm</option>
                       <option value="endterm">Endterm</option>
-                    </select>
-                  </>
-                )}
+                    </>
+                  )}
+                </select>
                 <div style={styles.row}>
                   <button type="submit" style={styles.btn()}>{editUser ? 'Save Changes' : 'Create User'}</button>
                   <button type="button" style={styles.btn('#6b7280')} onClick={() => { setShowForm(false); setEditUser(null); setError(''); }}>Cancel</button>
