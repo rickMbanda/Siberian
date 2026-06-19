@@ -5,7 +5,8 @@ const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem('sv_token') || ''}`
 });
 
-const handle = async (res) => {
+const handle = async (fetchPromise) => {
+  const res = await fetchPromise;
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Request failed: ${res.statusText}`);
