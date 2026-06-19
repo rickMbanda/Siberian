@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import DataEntryGrid from '../Components/DataEntryGrid';
 import { calculateMean, calculateRubric } from '../Utils/calculations';
@@ -9,6 +9,7 @@ import ExamNavigation from '../Components/ExamNavigation';
 import { getSubjectsByClass } from '../Utils/subjectsByClass';
 import { useAuth } from '../contexts/AuthContext';
 import CsvImportModal from '../Components/CsvImportModal';
+import { fetchActiveExam, saveActiveExam } from '../api/activeExam';
 
 const CLASSES = ['Playgroup','PP1','PP2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9'];
 const TERMS   = ['Term 1','Term 2','Term 3'];
@@ -73,6 +74,27 @@ const EndtermExam = () => {
       setLockError(err.message || 'Failed to unlock.');
     } finally { setLockBusy(false); }
   };
+
+  // Teacher: on mount, sync to whatever term/year the admin has set as active
+  const initialMount = useRef(true);
+  useEffect(() => {
+    if (isAdmin) return;
+    fetchActiveExam()
+      .then(cfg => {
+        if (cfg.term) setSelectedTerm(cfg.term);
+        if (cfg.academicYear) setSelectedYear(cfg.academicYear);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Admin: whenever term or year changes (after mount), persist as active exam
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (initialMount.current) { initialMount.current = false; return; }
+    saveActiveExam({ academicYear: selectedYear, term: selectedTerm }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear, selectedTerm]);
 
   useEffect(() => {
     const load = async () => {

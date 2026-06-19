@@ -7,6 +7,7 @@ const resultsRouter     = require('./routes/results');
 const authRouter        = require('./routes/auth');
 const studentsRouter    = require('./routes/students');
 const locksRouter       = require('./routes/locks');
+const activeExamRouter  = require('./routes/activeExam');
 const targetsRouter     = require('./routes/targets');
 const parentPinsRouter  = require('./routes/parentPins');
 const { authenticate } = require('./middleware/auth');
@@ -52,6 +53,9 @@ app.use('/api/students', authenticate, studentsRouter);
 
 // Locks routes (protected - require login)
 app.use('/api/locks', authenticate, locksRouter);
+
+// Active exam config (protected - admin write, any user read)
+app.use('/api/active-exam', authenticate, activeExamRouter);
 
 // Performance targets (protected)
 app.use('/api/targets', authenticate, targetsRouter);
