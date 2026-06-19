@@ -3,7 +3,7 @@ import { useLocation, Link } from 'react-router-dom';
 import DataEntryGrid from '../Components/DataEntryGrid';
 import { calculateMean, calculateRubric } from '../Utils/calculations';
 import { upsertStudentMarks } from '../api/students';
-import { fetchLockStatus } from '../api/locks';
+import { fetchLockStatus, setLockConfig, clearLock } from '../api/locks';
 import { loadGradingRows } from '../Utils/loadGradingRows';
 import ExamNavigation from '../Components/ExamNavigation';
 import { getSubjectsByClass } from '../Utils/subjectsByClass';
@@ -38,8 +38,11 @@ const MidtermExam = () => {
 
   const [students, setStudents] = useState([]);
   const [loadingExisting, setLoadingExisting] = useState(true);
-  const [lockStatus, setLockStatus] = useState({ locked: false, effectiveAt: null });
+  const [lockStatus, setLockStatus] = useState({ locked: false, effectiveAt: null, id: null });
   const [csvOpen, setCsvOpen] = useState(false);
+  const [gracePeriod, setGracePeriod] = useState(0);
+  const [lockBusy, setLockBusy] = useState(false);
+  const [lockError, setLockError] = useState('');
 
   const loadLockStatus = async () => {
     try {
@@ -47,8 +50,28 @@ const MidtermExam = () => {
       setLockStatus(status);
     } catch (err) {
       console.error('Could not load lock status for midterm exam:', err);
-      setLockStatus({ locked: false, effectiveAt: null });
+      setLockStatus({ locked: false, effectiveAt: null, id: null });
     }
+  };
+
+  const handleLock = async () => {
+    setLockBusy(true); setLockError('');
+    try {
+      await setLockConfig({ academicYear: selectedYear, term: selectedTerm, examType: 'midterm', gracePeriodMinutes: Number(gracePeriod) || 0 });
+      await loadLockStatus();
+    } catch (err) {
+      setLockError(err.message || 'Failed to lock.');
+    } finally { setLockBusy(false); }
+  };
+
+  const handleUnlock = async () => {
+    setLockBusy(true); setLockError('');
+    try {
+      await clearLock(lockStatus.id);
+      await loadLockStatus();
+    } catch (err) {
+      setLockError(err.message || 'Failed to unlock.');
+    } finally { setLockBusy(false); }
   };
 
   useEffect(() => {
@@ -195,9 +218,48 @@ const MidtermExam = () => {
                 {loadingExisting && <span style={{ color: '#11998e', marginLeft: 10 }}>Loading…</span>}
               </p>
             )}
-            <p style={{ color: lockStatus.locked ? '#a62323' : '#1f6feb', marginTop: '8px', fontWeight: '600' }}>
-              {lockStatus.locked ? 'Locked for teacher entry.' : 'Open for teacher entry.'}
-            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+              <span style={{ color: lockStatus.locked ? '#a62323' : '#1f6feb', fontWeight: '700', fontSize: '0.95rem' }}>
+                {lockStatus.locked ? '🔒 Locked for teacher entry.' : '🔓 Open for teacher entry.'}
+              </span>
+              {lockStatus.locked && lockStatus.effectiveAt && (
+                <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                  (since {new Date(lockStatus.effectiveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                </span>
+              )}
+              {isAdmin && (
+                lockStatus.locked ? (
+                  <button
+                    onClick={handleUnlock}
+                    disabled={lockBusy}
+                    style={{ padding: '5px 14px', borderRadius: '7px', border: 'none', background: '#dc2626', color: '#fff', fontWeight: '700', fontSize: '0.82rem', cursor: lockBusy ? 'wait' : 'pointer', opacity: lockBusy ? 0.7 : 1 }}
+                  >
+                    {lockBusy ? '…' : '🔓 Unlock'}
+                  </button>
+                ) : (
+                  <>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1440"
+                      value={gracePeriod}
+                      onChange={e => setGracePeriod(e.target.value)}
+                      placeholder="Grace mins"
+                      title="Grace period in minutes before lock takes effect (0 = immediate)"
+                      style={{ width: '90px', padding: '4px 8px', borderRadius: '7px', border: '1.5px solid #c7d2fe', fontSize: '0.82rem', fontWeight: '600' }}
+                    />
+                    <button
+                      onClick={handleLock}
+                      disabled={lockBusy}
+                      style={{ padding: '5px 14px', borderRadius: '7px', border: 'none', background: '#0b3d91', color: '#fff', fontWeight: '700', fontSize: '0.82rem', cursor: lockBusy ? 'wait' : 'pointer', opacity: lockBusy ? 0.7 : 1 }}
+                    >
+                      {lockBusy ? '…' : '🔒 Lock'}
+                    </button>
+                  </>
+                )
+              )}
+              {lockError && <span style={{ color: '#dc2626', fontSize: '0.8rem' }}>{lockError}</span>}
+            </div>
           </div>
           {!lockStatus.locked && (
             <button
