@@ -88,13 +88,14 @@ const MidtermExam = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Admin: whenever term or year changes (after mount), persist as active exam
-  useEffect(() => {
-    if (!isAdmin) return;
-    if (initialMount.current) { initialMount.current = false; return; }
-    saveActiveExam({ academicYear: selectedYear, term: selectedTerm }).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYear, selectedTerm]);
+  const [activeExamSaved, setActiveExamSaved] = useState(false);
+  const handleSetActiveExam = async () => {
+    try {
+      await saveActiveExam({ academicYear: selectedYear, term: selectedTerm });
+      setActiveExamSaved(true);
+      setTimeout(() => setActiveExamSaved(false), 2500);
+    } catch (e) { /* silent */ }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -232,6 +233,13 @@ const MidtermExam = () => {
                 <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} style={selStyle}>
                   {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
+                <button
+                  onClick={handleSetActiveExam}
+                  title="Push this Year + Term to all teachers so their grid loads the same exam"
+                  style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: activeExamSaved ? '#16a34a' : '#0b3d91', color: '#fff', fontWeight: '700', fontSize: '0.82rem', cursor: 'pointer', transition: 'background 0.3s', whiteSpace: 'nowrap' }}
+                >
+                  {activeExamSaved ? '✓ Active exam set!' : '📢 Set as Active Exam'}
+                </button>
                 {loadingExisting && <span style={{ color: '#11998e', fontSize: '0.85rem' }}>Loading…</span>}
               </div>
             ) : (
