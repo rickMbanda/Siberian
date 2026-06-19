@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import DataEntryGrid from '../Components/DataEntryGrid';
 import { calculateMean, calculateRubric } from '../Utils/calculations';
@@ -75,18 +75,25 @@ const OpenerExam = () => {
     } finally { setLockBusy(false); }
   };
 
-  // Teacher: on mount, sync to whatever term/year the admin has set as active
-  const initialMount = useRef(true);
-  useEffect(() => {
-    if (isAdmin) return;
+  const [syncMsg, setSyncMsg] = useState('');
+  const syncActiveExam = () => {
+    setSyncMsg('Syncing…');
     fetchActiveExam()
       .then(cfg => {
-        if (cfg.term) setSelectedTerm(cfg.term);
-        if (cfg.academicYear) setSelectedYear(cfg.academicYear);
+        if (cfg.term && cfg.academicYear) {
+          setSelectedTerm(cfg.term);
+          setSelectedYear(cfg.academicYear);
+          setSyncMsg(`✓ Synced: ${cfg.term}, ${cfg.academicYear}`);
+        } else {
+          setSyncMsg('No active exam set yet.');
+        }
+        setTimeout(() => setSyncMsg(''), 3000);
       })
-      .catch(() => {});
+      .catch(err => { setSyncMsg('Sync failed: ' + (err.message || 'unknown error')); });
+  };
+  // Auto-sync for teachers on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { if (!isAdmin) syncActiveExam(); }, []);
 
   const [activeExamSaved, setActiveExamSaved] = useState(false);
   const handleSetActiveExam = async () => {
@@ -243,10 +250,25 @@ const OpenerExam = () => {
                 {loadingExisting && <span style={{ color: '#667eea', fontSize: '0.85rem' }}>Loading…</span>}
               </div>
             ) : (
-              <p style={styles.subtitle}>
-                {selectedYear} – {selectedTerm} – Class: {selectedClass}
-                {loadingExisting && <span style={{ color: '#667eea', marginLeft: 10 }}>Loading…</span>}
-              </p>
+              <div style={{ marginTop: '8px' }}>
+                <p style={styles.subtitle}>
+                  {selectedYear} – {selectedTerm} – Class: {selectedClass}
+                  {loadingExisting && <span style={{ color: '#667eea', marginLeft: 10 }}>Loading…</span>}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={syncActiveExam}
+                    style={{ padding: '5px 14px', borderRadius: '7px', border: '1.5px solid #6366f1', background: '#fff', color: '#4338ca', fontWeight: '700', fontSize: '0.8rem', cursor: 'pointer' }}
+                  >
+                    🔄 Sync with admin
+                  </button>
+                  {syncMsg && (
+                    <span style={{ fontSize: '0.8rem', fontWeight: '600', color: syncMsg.startsWith('✓') ? '#16a34a' : syncMsg.startsWith('Sync failed') ? '#dc2626' : '#6b7280' }}>
+                      {syncMsg}
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
               <span style={{ color: lockStatus.locked ? '#a62323' : '#1f6feb', fontWeight: '700', fontSize: '0.95rem' }}>
