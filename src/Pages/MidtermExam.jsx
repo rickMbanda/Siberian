@@ -10,14 +10,23 @@ import { getSubjectsByClass } from '../Utils/subjectsByClass';
 import { useAuth } from '../contexts/AuthContext';
 import CsvImportModal from '../Components/CsvImportModal';
 
+const CLASSES = ['Playgroup','PP1','PP2','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9'];
+const TERMS   = ['Term 1','Term 2','Term 3'];
+const currentYear = new Date().getFullYear();
+const YEARS   = Array.from({ length: 8 }, (_, i) => (currentYear - 2 + i).toString());
+
 const MidtermExam = () => {
   const location = useLocation();
   const { user } = useAuth();
-  const selectedClass = location.state?.selectedClass ||
+  const isAdmin = user?.role === 'admin';
+
+  const [selectedClass, setSelectedClass] = useState(
+    location.state?.selectedClass ||
     new URLSearchParams(location.search).get('class') ||
-    user?.assignedClass || 'Playgroup';
-  const selectedTerm  = location.state?.selectedTerm  || 'Term 1';
-  const selectedYear  = location.state?.selectedYear  || new Date().getFullYear().toString();
+    user?.assignedClass || 'Playgroup'
+  );
+  const [selectedTerm, setSelectedTerm] = useState(location.state?.selectedTerm || 'Term 1');
+  const [selectedYear, setSelectedYear] = useState(location.state?.selectedYear || currentYear.toString());
 
   const currentExamType = 'midterm';
   const allowedExamType = user?.allowedExamType || 'opener';
@@ -129,6 +138,11 @@ const MidtermExam = () => {
     );
   };
 
+  const selStyle = {
+    padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #c7d2fe',
+    background: '#fff', color: '#1e3a5f', fontWeight: '600', fontSize: '0.92rem', cursor: 'pointer'
+  };
+
   const styles = {
     container: {
       background: 'linear-gradient(135deg, #bae6fd 0%, #7dd3fc 100%)',
@@ -147,11 +161,7 @@ const MidtermExam = () => {
       borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
     },
     logo:  { height: '60px', width: 'auto', borderRadius: '12px' },
-    title: {
-      fontSize: '2.5rem', fontWeight: '700',
-      color: '#000080',
-      margin: 0, letterSpacing: '-1px'
-    },
+    title: { fontSize: '2.5rem', fontWeight: '700', color: '#000080', margin: 0, letterSpacing: '-1px' },
     subtitle: { fontSize: '1.1rem', color: '#6b7280', fontWeight: '500', marginTop: '8px' }
   };
 
@@ -163,10 +173,28 @@ const MidtermExam = () => {
           <img src="/logschool.png" alt="School Logo" style={styles.logo} />
           <div style={{ flex: 1 }}>
             <h1 style={styles.title}>Midterm Exam Results</h1>
-            <p style={styles.subtitle}>
-              {selectedYear} – {selectedTerm} – Class: {selectedClass}
-              {loadingExisting && <span style={{ color: '#11998e', marginLeft: 10 }}>Loading…</span>}
-            </p>
+            {isAdmin ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '10px', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151' }}>Year:</label>
+                <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} style={selStyle}>
+                  {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151' }}>Term:</label>
+                <select value={selectedTerm} onChange={e => setSelectedTerm(e.target.value)} style={selStyle}>
+                  {TERMS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151' }}>Class:</label>
+                <select value={selectedClass} onChange={e => setSelectedClass(e.target.value)} style={selStyle}>
+                  {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                {loadingExisting && <span style={{ color: '#11998e', fontSize: '0.85rem' }}>Loading…</span>}
+              </div>
+            ) : (
+              <p style={styles.subtitle}>
+                {selectedYear} – {selectedTerm} – Class: {selectedClass}
+                {loadingExisting && <span style={{ color: '#11998e', marginLeft: 10 }}>Loading…</span>}
+              </p>
+            )}
             <p style={{ color: lockStatus.locked ? '#a62323' : '#1f6feb', marginTop: '8px', fontWeight: '600' }}>
               {lockStatus.locked ? 'Locked for teacher entry.' : 'Open for teacher entry.'}
             </p>

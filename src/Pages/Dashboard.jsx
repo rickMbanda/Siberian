@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ExamNavigation from '../Components/ExamNavigation';
 import { useAuth } from '../contexts/AuthContext';
@@ -234,6 +234,42 @@ const Dashboard = () => {
           <h3>Current Selection: {selectedYear} - {selectedTerm} - {selectedClass}</h3>
         </div>
 
+
+        {/* Enter Marks section */}
+        <div style={{ marginBottom: '32px' }}>
+          <h3 style={{ textAlign: 'center', color: '#0b3d91', fontWeight: '700', fontSize: '1.2rem', marginBottom: '16px' }}>
+            Enter Marks
+          </h3>
+          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {[
+              { label: '📝 Opener',   path: '/opener',  bg: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', shadow: 'rgba(16,185,129,0.3)' },
+              { label: '📝 Midterm',  path: '/midterm', bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', shadow: 'rgba(245,158,11,0.3)' },
+              { label: '📝 Endterm',  path: '/endterm', bg: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', shadow: 'rgba(239,68,68,0.3)' },
+            ].map(({ label, path, bg, shadow }) => (
+              <button
+                key={path}
+                onClick={() => navigate(path, { state: { selectedClass, selectedTerm, selectedYear } })}
+                style={{
+                  padding: '16px 32px',
+                  background: bg,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontSize: '1.05rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  boxShadow: `0 8px 32px ${shadow}`,
+                  transition: 'all 0.3s ease',
+                  minWidth: '160px',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.05) translateY(-2px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1) translateY(0)'; }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div style={{ 
           textAlign: 'center', 
