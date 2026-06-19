@@ -57,7 +57,7 @@ const ProtectedRoutes = () => {
           <Route path="/targets" element={<Targets />} />
         </>
       ) : (
-        <Route path="/" element={<Navigate to="/opener" replace />} />
+        <Route path="/" element={<Navigate to={`/${user.allowedExamType || 'opener'}`} replace />} />
       )}
 
       {/* Shared pages - both admin and teacher */}
@@ -66,15 +66,15 @@ const ProtectedRoutes = () => {
       <Route path="/endterm" element={<EndTermExam />} />
       <Route path="/change-password" element={<ChangePassword />} />
 
-      {/* Redirect teachers away from admin pages */}
+      {/* Redirect teachers away from admin pages — send to their assigned exam */}
       {!isAdmin && (
         <>
-          <Route path="/reports" element={<Navigate to="/opener" replace />} />
-          <Route path="/results-manager" element={<Navigate to="/opener" replace />} />
-          <Route path="/students" element={<Navigate to="/opener" replace />} />
-          <Route path="/users" element={<Navigate to="/opener" replace />} />
-          <Route path="/promotion" element={<Navigate to="/opener" replace />} />
-          <Route path="/targets" element={<Navigate to="/opener" replace />} />
+          <Route path="/reports" element={<Navigate to={`/${user.allowedExamType || 'opener'}`} replace />} />
+          <Route path="/results-manager" element={<Navigate to={`/${user.allowedExamType || 'opener'}`} replace />} />
+          <Route path="/students" element={<Navigate to={`/${user.allowedExamType || 'opener'}`} replace />} />
+          <Route path="/users" element={<Navigate to={`/${user.allowedExamType || 'opener'}`} replace />} />
+          <Route path="/promotion" element={<Navigate to={`/${user.allowedExamType || 'opener'}`} replace />} />
+          <Route path="/targets" element={<Navigate to={`/${user.allowedExamType || 'opener'}`} replace />} />
         </>
       )}
 
