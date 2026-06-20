@@ -94,19 +94,19 @@ const DataEntryGrid = ({
     const totalRows = students.length;
     const { key } = e;
 
-    if (key === 'ArrowDown' || key === 'Enter') {
+    if (key === 'ArrowDown') {
       e.preventDefault();
       if (rowIndex + 1 < totalRows) focusCell(rowIndex + 1, colIndex);
-    } else if (key === 'ArrowUp') {
-      e.preventDefault();
-      if (rowIndex - 1 >= 0) focusCell(rowIndex - 1, colIndex);
-    } else if (key === 'ArrowRight') {
+    } else if (key === 'Enter' || key === 'ArrowRight') {
       e.preventDefault();
       if (colIndex + 1 < totalCols) {
         focusCell(rowIndex, colIndex + 1);
       } else if (rowIndex + 1 < totalRows) {
         focusCell(rowIndex + 1, 0);
       }
+    } else if (key === 'ArrowUp') {
+      e.preventDefault();
+      if (rowIndex - 1 >= 0) focusCell(rowIndex - 1, colIndex);
     } else if (key === 'ArrowLeft') {
       e.preventDefault();
       if (colIndex - 1 >= 0) {
