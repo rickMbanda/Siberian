@@ -156,6 +156,7 @@ const Analytics = () => {
   const [atRiskThreshold, setAtRiskThreshold]   = useState(40);
 
   const [weaknessClass, setWeaknessClass]  = useState('All Classes');
+  const [atRiskClass,   setAtRiskClass]    = useState('All Classes');
 
   const [termAterm, setTermAterm]         = useState('Term 1');
   const [termAexam, setTermAexam]         = useState('endterm');
@@ -313,13 +314,15 @@ const Analytics = () => {
   }, [allResults, selectedStudent]);
 
   /* ── Tab 4: At-Risk Students ─────────────────────────────────── */
-  const atRiskList = useMemo(() =>
-    filteredResults
+  const atRiskList = useMemo(() => {
+    const rows = atRiskClass === 'All Classes'
+      ? filteredResults
+      : filteredResults.filter((r) => r.class === atRiskClass);
+    return rows
       .filter((r) => typeof r.mean === 'number' && r.mean < atRiskThreshold)
       .sort((a, b) => a.mean - b.mean)
-      .map((r) => ({ name: r.name, cls: r.class, mean: r.mean, rubric: r.rubric })),
-    [filteredResults, atRiskThreshold]
-  );
+      .map((r) => ({ name: r.name, cls: r.class, mean: r.mean, rubric: r.rubric }));
+  }, [filteredResults, atRiskThreshold, atRiskClass]);
 
   /* ── Tab 5: Subject Weakness ─────────────────────────────────── */
   const subjectWeakness = useMemo(() => {
@@ -957,9 +960,9 @@ const Analytics = () => {
           {/* ══ Tab 4: At-Risk Students ══ */}
           {activeTab === 4 && (
             <div ref={atRiskRef}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '20px' }}>
                 <p style={{ ...S.sectionTitle, margin: 0 }}>
-                  At-Risk Students — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+                  At-Risk Students — {atRiskClass === 'All Classes' ? 'All Classes' : atRiskClass} · {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
                 </p>
                 <div style={S.filterGroup}>
                   <span style={S.filterLabel}>Threshold — scoring below</span>
@@ -975,19 +978,30 @@ const Analytics = () => {
                     </span>
                   </div>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151', whiteSpace: 'nowrap' }}>Class:</label>
+                  <select
+                    value={atRiskClass}
+                    onChange={(e) => setAtRiskClass(e.target.value)}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '0.875rem', fontWeight: '600', color: '#1e3a5f', background: '#f9fafb', cursor: 'pointer' }}
+                  >
+                    <option value="All Classes">All Classes</option>
+                    {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
                 <div style={{ marginLeft: 'auto' }}>
-                  {dlBtn('atRisk', atRiskRef, `At_Risk_Students_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, atRiskList.length === 0)}
+                  {dlBtn('atRisk', atRiskRef, `At_Risk_Students_${atRiskClass === 'All Classes' ? 'All' : atRiskClass.replace(/ /g,'_')}_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, atRiskList.length === 0)}
                 </div>
               </div>
 
               {atRiskList.length === 0 ? (
                 <div style={{ ...S.empty, color: '#22c55e', fontWeight: '600' }}>
-                  No students below {atRiskThreshold} for this selection.
+                  No students below {atRiskThreshold}{atRiskClass !== 'All Classes' ? ` in ${atRiskClass}` : ''} for this selection.
                 </div>
               ) : (
                 <>
                   <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '12px' }}>
-                    {atRiskList.length} student{atRiskList.length !== 1 ? 's' : ''} scoring below&nbsp;
+                    {atRiskList.length} student{atRiskList.length !== 1 ? 's' : ''}{atRiskClass !== 'All Classes' ? ` in ${atRiskClass}` : ''} scoring below&nbsp;
                     <strong style={{ color: '#ef4444' }}>{atRiskThreshold}</strong>
                   </p>
                   <div style={{ overflowX: 'auto' }}>
