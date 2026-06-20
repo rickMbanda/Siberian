@@ -621,6 +621,17 @@ const Analytics = () => {
                           }),
                           borderRadius: 6,
                         },
+                        {
+                          type: 'line',
+                          label: `School Average (${compStats.school.toFixed(1)})`,
+                          data: classComparison.labels.map(() => compStats.school),
+                          borderColor: '#6366f1',
+                          borderWidth: 2,
+                          borderDash: [6, 4],
+                          pointRadius: 0,
+                          fill: false,
+                          tension: 0,
+                        },
                         ...(schoolTarget != null ? [{
                           type: 'line',
                           label: `Target (${schoolTarget})`,
@@ -637,11 +648,74 @@ const Analytics = () => {
                     options={{
                       ...baseChartOptions,
                       plugins: {
-                        legend: { display: schoolTarget != null },
-                        tooltip: { callbacks: { label: (ctx) => ctx.dataset.type === 'line' ? ` Target: ${ctx.parsed.y}` : ` Mean: ${ctx.parsed.y?.toFixed(1) ?? 'N/A'}` } },
+                        legend: { display: true },
+                        tooltip: {
+                          callbacks: {
+                            label: (ctx) => {
+                              if (ctx.dataset.type === 'line') return ` ${ctx.dataset.label}`;
+                              return ` Mean: ${ctx.parsed.y?.toFixed(1) ?? 'N/A'}`;
+                            }
+                          }
+                        },
                       },
                     }}
                   />
+
+                  {/* ── Class vs School Average delta table ── */}
+                  <div style={{ marginTop: '32px' }}>
+                    <p style={{ fontWeight: '700', fontSize: '1rem', color: '#1f2937', marginBottom: '12px' }}>
+                      Class vs School Average — {compStats.school.toFixed(1)} school mean
+                    </p>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={S.table}>
+                        <thead>
+                          <tr>
+                            <th style={S.th}>Class</th>
+                            <th style={{ ...S.th, textAlign: 'center' }}>Class Average</th>
+                            <th style={{ ...S.th, textAlign: 'center' }}>School Average</th>
+                            <th style={{ ...S.th, textAlign: 'center' }}>Difference</th>
+                            <th style={S.th}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {classComparison.labels.map((cls, i) => {
+                            const clsMean = classComparison.means[i];
+                            if (clsMean === null) return null;
+                            const delta = clsMean - compStats.school;
+                            const absDelta = Math.abs(delta);
+                            const isAbove = delta >= 0.05;
+                            const isBelow = delta < -0.05;
+                            const deltaColor = isAbove ? '#15803d' : isBelow ? '#dc2626' : '#6b7280';
+                            const deltaBg   = isAbove ? '#dcfce7' : isBelow ? '#fee2e2' : '#f3f4f6';
+                            const { bg, text } = scoreColor(clsMean);
+                            return (
+                              <tr key={cls} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                                <td style={{ ...S.td, fontWeight: '700', color: '#0b3d91' }}>{cls}</td>
+                                <td style={{ ...S.td, textAlign: 'center' }}>
+                                  <span style={{ background: bg, color: text, padding: '3px 12px', borderRadius: '20px', fontWeight: '700', fontSize: '0.875rem' }}>
+                                    {clsMean.toFixed(1)}
+                                  </span>
+                                </td>
+                                <td style={{ ...S.td, textAlign: 'center', color: '#6b7280', fontWeight: '600' }}>
+                                  {compStats.school.toFixed(1)}
+                                </td>
+                                <td style={{ ...S.td, textAlign: 'center' }}>
+                                  <span style={{ background: deltaBg, color: deltaColor, padding: '3px 12px', borderRadius: '20px', fontWeight: '700', fontSize: '0.875rem' }}>
+                                    {isAbove ? '+' : isBelow ? '−' : ''}{absDelta.toFixed(1)}
+                                  </span>
+                                </td>
+                                <td style={{ ...S.td }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: deltaColor, fontWeight: '600', fontSize: '0.85rem' }}>
+                                    {isAbove ? '▲ Above average' : isBelow ? '▼ Below average' : '● At average'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </>
               ) : (
                 <div style={S.empty}>No data for the selected filters.</div>
