@@ -219,6 +219,18 @@ const DataEntryGrid = ({
 
   const hasRoster = students.length > 0;
 
+  // Progress: count students whose marks are fully entered
+  const completedCount = students.filter((student) => {
+    const status = student.examStatus || 'sat';
+    if (status === 'absent' || status === 'incomplete') return true;
+    return subjects.every(
+      (s) => student[s] !== '' && student[s] != null && !isNaN(parseFloat(student[s]))
+    );
+  }).length;
+  const totalCount   = students.length;
+  const progressPct  = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const allDone      = completedCount === totalCount && totalCount > 0;
+
   return (
     <div style={styles.container}>
       <div style={{ marginBottom: '20px' }}>
@@ -235,6 +247,35 @@ const DataEntryGrid = ({
           &nbsp;Use <strong>arrow keys</strong> or <strong>Enter</strong> to move between cells.
         </p>
       </div>
+
+      {/* Progress bar */}
+      {hasRoster && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: allDone ? '#15803d' : '#374151' }}>
+              {allDone ? '✅ All students complete!' : `${completedCount} of ${totalCount} students complete`}
+            </span>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: allDone ? '#15803d' : '#6b7280' }}>
+              {progressPct}%
+            </span>
+          </div>
+          <div style={{ height: '10px', borderRadius: '99px', background: '#e5e7eb', overflow: 'hidden' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${progressPct}%`,
+                borderRadius: '99px',
+                background: allDone
+                  ? 'linear-gradient(90deg, #16a34a, #22c55e)'
+                  : progressPct >= 50
+                  ? 'linear-gradient(90deg, #2563eb, #60a5fa)'
+                  : 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                transition: 'width 0.4s ease, background 0.4s ease',
+              }}
+            />
+          </div>
+        </div>
+      )}
       {locked && (
         <div style={styles.lockBanner}>
           🔒 This exam is locked for teacher input. Only an admin can unlock marks or change the lock settings.
