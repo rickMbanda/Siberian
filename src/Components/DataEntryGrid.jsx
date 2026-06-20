@@ -76,6 +76,47 @@ const DataEntryGrid = ({
     };
   }, [students, autoSaveStudent]);
 
+  /* ── Keyboard navigation ────────────────────────────────────── */
+  const gridRef = useRef(null);
+
+  const focusCell = useCallback((row, col) => {
+    if (!gridRef.current) return;
+    const el = gridRef.current.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+    if (!el) return;
+    el.focus();
+    try { el.select(); } catch (_) {}
+  }, []);
+
+  // col 0 = Exam Status select, col 1..N = subject inputs
+  const totalCols = subjects.length + 1;
+
+  const handleKeyDown = useCallback((e, rowIndex, colIndex) => {
+    const totalRows = students.length;
+    const { key } = e;
+
+    if (key === 'ArrowDown' || key === 'Enter') {
+      e.preventDefault();
+      if (rowIndex + 1 < totalRows) focusCell(rowIndex + 1, colIndex);
+    } else if (key === 'ArrowUp') {
+      e.preventDefault();
+      if (rowIndex - 1 >= 0) focusCell(rowIndex - 1, colIndex);
+    } else if (key === 'ArrowRight') {
+      e.preventDefault();
+      if (colIndex + 1 < totalCols) {
+        focusCell(rowIndex, colIndex + 1);
+      } else if (rowIndex + 1 < totalRows) {
+        focusCell(rowIndex + 1, 0);
+      }
+    } else if (key === 'ArrowLeft') {
+      e.preventDefault();
+      if (colIndex - 1 >= 0) {
+        focusCell(rowIndex, colIndex - 1);
+      } else if (rowIndex - 1 >= 0) {
+        focusCell(rowIndex - 1, totalCols - 1);
+      }
+    }
+  }, [students.length, totalCols, focusCell]);
+
   const styles = {
     container: {
       fontFamily: 'Arial, sans-serif',
@@ -191,6 +232,7 @@ const DataEntryGrid = ({
         </h3>
         <p style={{ color: '#6c757d', fontSize: '14px', margin: '8px 0 0 0' }}>
           💡 Marks save automatically when all required fields are filled. To add or remove a student, use the Manage Students module.
+          &nbsp;Use <strong>arrow keys</strong> or <strong>Enter</strong> to move between cells.
         </p>
       </div>
       {locked && (
@@ -206,7 +248,7 @@ const DataEntryGrid = ({
           Ask the admin to add students using the <strong>Manage Students</strong> module.
         </div>
       ) : (
-        <div style={styles.tableWrapper}>
+        <div style={styles.tableWrapper} ref={gridRef}>
           <table style={styles.table}>
             <thead>
               <tr>
@@ -224,16 +266,18 @@ const DataEntryGrid = ({
               </tr>
             </thead>
             <tbody>
-              {students.map((student, index) => (
+              {students.map((student, rowIndex) => (
                 <tr
-                  key={student.id || student._id || index}
-                  style={index % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd}
+                  key={student.id || student._id || rowIndex}
+                  style={rowIndex % 2 === 0 ? styles.tableRowEven : styles.tableRowOdd}
                 >
                   <td style={{ ...styles.tableCell, ...styles.nameCell }}>
                     {student.name}
                   </td>
                   <td style={styles.tableCell}>
                     <select
+                      data-row={rowIndex}
+                      data-col={0}
                       style={{
                         ...styles.input,
                         cursor: locked ? 'not-allowed' : 'pointer',
@@ -251,15 +295,18 @@ const DataEntryGrid = ({
                           subjects.forEach((subject) => updateStudent(student.id, subject, ''));
                         }
                       }}
+                      onKeyDown={(e) => handleKeyDown(e, rowIndex, 0)}
                     >
                       <option value="sat">Sat</option>
                       <option value="absent">Absent</option>
                       <option value="incomplete">Incomplete</option>
                     </select>
                   </td>
-                  {subjects.map((subject) => (
+                  {subjects.map((subject, subjectIndex) => (
                     <td key={subject} style={styles.tableCell}>
                       <input
+                        data-row={rowIndex}
+                        data-col={subjectIndex + 1}
                         style={{
                           ...styles.input,
                           backgroundColor: student.examStatus === 'absent' ? '#f8f9fa' : '#fff',
@@ -283,6 +330,7 @@ const DataEntryGrid = ({
                             updateStudent(student.id, subject, value);
                           }
                         }}
+                        onKeyDown={(e) => handleKeyDown(e, rowIndex, subjectIndex + 1)}
                         placeholder={student.examStatus === 'absent' ? 'ABS' : '0-100'}
                       />
                     </td>
