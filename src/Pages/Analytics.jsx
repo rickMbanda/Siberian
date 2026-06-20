@@ -155,7 +155,7 @@ const Analytics = () => {
   const [studentSearch, setStudentSearch]       = useState('');
   const [atRiskThreshold, setAtRiskThreshold]   = useState(40);
 
-  const [weaknessClass, setWeaknessClass]  = useState('All Classes');
+  const [weaknessClass, setWeaknessClass]  = useState('Playgroup');
 
   const [termAterm, setTermAterm]         = useState('Term 1');
   const [termAexam, setTermAexam]         = useState('endterm');
@@ -323,14 +323,8 @@ const Analytics = () => {
 
   /* ── Tab 5: Subject Weakness ─────────────────────────────────── */
   const subjectWeakness = useMemo(() => {
-    const rows = weaknessClass === 'All Classes'
-      ? filteredResults
-      : filteredResults.filter((r) => r.class === weaknessClass);
-
-    const allowedSubjects = weaknessClass === 'All Classes'
-      ? Object.keys(SUBJECTS)
-      : getSubjectsByClass(weaknessClass);
-
+    const rows = filteredResults.filter((r) => r.class === weaknessClass);
+    const allowedSubjects = getSubjectsByClass(weaknessClass);
     return allowedSubjects
       .map((subj) => {
         const scores = rows
@@ -1033,15 +1027,13 @@ const Analytics = () => {
             <div ref={subjectWeakRef}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                 <p style={{ ...S.sectionTitle, margin: 0 }}>
-                  Subject Weakness Report — {weaknessClass === 'All Classes' ? 'All Classes' : weaknessClass} · {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+                  Subject Weakness Report — {weaknessClass} · {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
                 </p>
-                {dlBtn('subjectWeak', subjectWeakRef, `Subject_Weakness_${weaknessClass === 'All Classes' ? 'All' : weaknessClass.replace(/ /g,'_')}_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, subjectWeakness.length === 0)}
+                {dlBtn('subjectWeak', subjectWeakRef, `Subject_Weakness_${weaknessClass.replace(/ /g,'_')}_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, subjectWeakness.length === 0)}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
                 <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>
-                  {weaknessClass === 'All Classes'
-                    ? 'Subjects ranked weakest to strongest across the whole school. Top 3 in red need the most attention.'
-                    : `Subjects ranked weakest to strongest for ${weaknessClass}. Top 3 in red need the most attention.`}
+                  Subjects ranked weakest to strongest for <strong>{weaknessClass}</strong>. Averages are based on that class's students only. Top 3 in red need the most attention.
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
                   <label style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151', whiteSpace: 'nowrap' }}>Class:</label>
@@ -1050,7 +1042,6 @@ const Analytics = () => {
                     onChange={(e) => setWeaknessClass(e.target.value)}
                     style={{ padding: '6px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '0.875rem', fontWeight: '600', color: '#1e3a5f', background: '#f9fafb', cursor: 'pointer' }}
                   >
-                    <option value="All Classes">All Classes</option>
                     {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
