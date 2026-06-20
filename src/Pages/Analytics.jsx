@@ -17,6 +17,7 @@ import { Bar, Line } from 'react-chartjs-2';
 import ExamNavigation from '../Components/ExamNavigation';
 import { fetchResults } from '../api/results';
 import { fetchTarget } from '../api/targets';
+import { getSubjectsByClass } from '../Utils/subjectsByClass';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Filler, Title, Tooltip, Legend);
 
@@ -153,6 +154,8 @@ const Analytics = () => {
   const [progStudentClass, setProgStudentClass] = useState('');
   const [studentSearch, setStudentSearch]       = useState('');
   const [atRiskThreshold, setAtRiskThreshold]   = useState(40);
+
+  const [weaknessClass, setWeaknessClass]  = useState('All Classes');
 
   const [termAterm, setTermAterm]         = useState('Term 1');
   const [termAexam, setTermAexam]         = useState('endterm');
@@ -320,16 +323,24 @@ const Analytics = () => {
 
   /* ── Tab 5: Subject Weakness ─────────────────────────────────── */
   const subjectWeakness = useMemo(() => {
-    return Object.keys(SUBJECTS)
+    const rows = weaknessClass === 'All Classes'
+      ? filteredResults
+      : filteredResults.filter((r) => r.class === weaknessClass);
+
+    const allowedSubjects = weaknessClass === 'All Classes'
+      ? Object.keys(SUBJECTS)
+      : getSubjectsByClass(weaknessClass);
+
+    return allowedSubjects
       .map((subj) => {
-        const scores = filteredResults
+        const scores = rows
           .map((r) => r[subj])
           .filter((v) => typeof v === 'number' && !isNaN(v));
-        return { subj, label: SUBJECTS[subj], avg: scores.length ? avg(scores) : null, count: scores.length };
+        return { subj, label: SUBJECTS[subj] || subj, avg: scores.length ? avg(scores) : null, count: scores.length };
       })
       .filter((s) => s.avg !== null && s.count > 0)
       .sort((a, b) => a.avg - b.avg);
-  }, [filteredResults]);
+  }, [filteredResults, weaknessClass]);
 
   /* ── Tab 6: Term Comparison ──────────────────────────────────── */
   const termComparison = useMemo(() => {
@@ -1022,13 +1033,28 @@ const Analytics = () => {
             <div ref={subjectWeakRef}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
                 <p style={{ ...S.sectionTitle, margin: 0 }}>
-                  Subject Weakness Report — {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
+                  Subject Weakness Report — {weaknessClass === 'All Classes' ? 'All Classes' : weaknessClass} · {selectedTerm} · {EXAM_LABELS[selectedExamType]} · {selectedYear}
                 </p>
-                {dlBtn('subjectWeak', subjectWeakRef, `Subject_Weakness_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, subjectWeakness.length === 0)}
+                {dlBtn('subjectWeak', subjectWeakRef, `Subject_Weakness_${weaknessClass === 'All Classes' ? 'All' : weaknessClass.replace(/ /g,'_')}_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, subjectWeakness.length === 0)}
               </div>
-              <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '20px' }}>
-                Subjects ranked weakest to strongest across the whole school. Top 3 in red need the most attention.
-              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <p style={{ color: '#6b7280', fontSize: '0.875rem', margin: 0 }}>
+                  {weaknessClass === 'All Classes'
+                    ? 'Subjects ranked weakest to strongest across the whole school. Top 3 in red need the most attention.'
+                    : `Subjects ranked weakest to strongest for ${weaknessClass}. Top 3 in red need the most attention.`}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '600', color: '#374151', whiteSpace: 'nowrap' }}>Class:</label>
+                  <select
+                    value={weaknessClass}
+                    onChange={(e) => setWeaknessClass(e.target.value)}
+                    style={{ padding: '6px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '0.875rem', fontWeight: '600', color: '#1e3a5f', background: '#f9fafb', cursor: 'pointer' }}
+                  >
+                    <option value="All Classes">All Classes</option>
+                    {CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
 
               {subjectWeakness.length === 0 ? (
                 <div style={S.empty}>No subject data for the selected filters.</div>
@@ -1038,7 +1064,7 @@ const Analytics = () => {
                     data={{
                       labels: subjectWeakness.map((s) => s.label),
                       datasets: [{
-                        label: 'School-wide Average',
+                        label: weaknessClass === 'All Classes' ? 'School-wide Average' : `${weaknessClass} Average`,
                         data: subjectWeakness.map((s) => s.avg),
                         backgroundColor: subjectWeakness.map((s) =>
                           s.avg >= 80 ? '#22c55e' : s.avg >= 60 ? '#84cc16' : s.avg >= 40 ? '#f59e0b' : '#ef4444'
@@ -1062,7 +1088,7 @@ const Analytics = () => {
                         <tr>
                           <th style={S.th}>Rank</th>
                           <th style={S.th}>Subject</th>
-                          <th style={{ ...S.th, textAlign: 'center' }}>School Average</th>
+                          <th style={{ ...S.th, textAlign: 'center' }}>{weaknessClass === 'All Classes' ? 'School Average' : 'Class Average'}</th>
                           <th style={{ ...S.th, textAlign: 'center' }}>Students</th>
                           <th style={S.th}>Performance Band</th>
                         </tr>
