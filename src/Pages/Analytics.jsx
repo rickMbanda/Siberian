@@ -313,6 +313,18 @@ const Analytics = () => {
     return { cols, activeSubjects };
   }, [allResults, selectedStudent]);
 
+  /* ── Tab 4: At-Risk Students — class breakdown (school-wide) ─── */
+  const atRiskByClass = useMemo(() => {
+    const counts = {};
+    CLASSES.forEach((c) => { counts[c] = 0; });
+    filteredResults.forEach((r) => {
+      if (typeof r.mean === 'number' && r.mean < atRiskThreshold && counts[r.class] !== undefined) {
+        counts[r.class]++;
+      }
+    });
+    return CLASSES.map((c) => ({ cls: c, count: counts[c] }));
+  }, [filteredResults, atRiskThreshold]);
+
   /* ── Tab 4: At-Risk Students ─────────────────────────────────── */
   const atRiskList = useMemo(() => {
     const rows = atRiskClass === 'All Classes'
@@ -993,6 +1005,62 @@ const Analytics = () => {
                   {dlBtn('atRisk', atRiskRef, `At_Risk_Students_${atRiskClass === 'All Classes' ? 'All' : atRiskClass.replace(/ /g,'_')}_${selectedYear}_${selectedTerm}_${EXAM_LABELS[selectedExamType]}.pdf`, atRiskList.length === 0)}
                 </div>
               </div>
+
+              {/* Class breakdown bar chart — always school-wide */}
+              {atRiskByClass.some((c) => c.count > 0) && (
+                <div style={{ marginBottom: '28px' }}>
+                  <p style={{ fontWeight: '700', fontSize: '0.9rem', color: '#374151', marginBottom: '8px' }}>
+                    At-Risk Count by Class — all classes, scoring below {atRiskThreshold}
+                    {atRiskClass !== 'All Classes' && (
+                      <span style={{ marginLeft: '10px', fontWeight: '500', color: '#6366f1', fontSize: '0.82rem' }}>
+                        ({atRiskClass} highlighted)
+                      </span>
+                    )}
+                  </p>
+                  <Bar
+                    data={{
+                      labels: atRiskByClass.map((c) => c.cls),
+                      datasets: [{
+                        label: 'At-Risk Students',
+                        data: atRiskByClass.map((c) => c.count),
+                        backgroundColor: atRiskByClass.map((c) =>
+                          atRiskClass !== 'All Classes' && c.cls === atRiskClass
+                            ? '#ef4444'
+                            : c.count === 0 ? '#e5e7eb' : '#fca5a5'
+                        ),
+                        borderColor: atRiskByClass.map((c) =>
+                          atRiskClass !== 'All Classes' && c.cls === atRiskClass ? '#b91c1c' : 'transparent'
+                        ),
+                        borderWidth: 2,
+                        borderRadius: 6,
+                      }],
+                    }}
+                    options={{
+                      ...baseChartOptions,
+                      scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, title: { display: true, text: 'Students' } },
+                        x: {},
+                      },
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => ` ${ctx.parsed.y} at-risk student${ctx.parsed.y !== 1 ? 's' : ''}` } },
+                      },
+                      onClick: (_, elements) => {
+                        if (elements.length > 0) {
+                          const cls = atRiskByClass[elements[0].index].cls;
+                          setAtRiskClass((prev) => prev === cls ? 'All Classes' : cls);
+                        }
+                      },
+                      onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+                      },
+                    }}
+                  />
+                  <p style={{ color: '#9ca3af', fontSize: '0.78rem', marginTop: '6px', textAlign: 'center' }}>
+                    Click a bar to filter — click again to reset
+                  </p>
+                </div>
+              )}
 
               {atRiskList.length === 0 ? (
                 <div style={{ ...S.empty, color: '#22c55e', fontWeight: '600' }}>
