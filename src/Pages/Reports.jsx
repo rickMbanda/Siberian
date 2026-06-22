@@ -275,7 +275,7 @@ const Reports = () => {
       );
       await new Promise((resolve) => setTimeout(resolve, 250));
 
-      const canvas = await html2canvas(individualRef.current, {
+      const rawCanvas = await html2canvas(individualRef.current, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
@@ -286,26 +286,27 @@ const Reports = () => {
 
       document.head.removeChild(style);
 
-      // Always fit the entire report onto exactly one A4 page
       const pdf = new jsPDF('p', 'mm', 'a4');
       const margin = 8;
       const availableWidth  = 210 - margin * 2;
       const availableHeight = 297 - margin * 2;
-
-      const canvasAspect    = canvas.height / canvas.width;
       const availableAspect = availableHeight / availableWidth;
 
-      let imgWidth, imgHeight;
-      if (canvasAspect > availableAspect) {
-        imgHeight = availableHeight;
-        imgWidth  = imgHeight / canvasAspect;
-      } else {
-        imgWidth  = availableWidth;
-        imgHeight = imgWidth * canvasAspect;
+      // Pad canvas to A4 aspect ratio so the PDF page is always completely filled
+      const targetH = Math.round(rawCanvas.width * availableAspect);
+      let canvas = rawCanvas;
+      if (rawCanvas.height < targetH) {
+        const padded = document.createElement('canvas');
+        padded.width  = rawCanvas.width;
+        padded.height = targetH;
+        const ctx = padded.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, padded.width, padded.height);
+        ctx.drawImage(rawCanvas, 0, 0);
+        canvas = padded;
       }
 
-      const xOffset = margin + (availableWidth - imgWidth) / 2;
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xOffset, margin, imgWidth, imgHeight);
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, availableWidth, availableHeight);
       pdf.save(`Individual_Report_${selectedStudent.name}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -367,9 +368,11 @@ const Reports = () => {
       const availableWidth  = 210 - margin * 2;
       const availableHeight = 297 - margin * 2;
 
+      const availableAspect = availableHeight / availableWidth;
+
       for (let i = 0; i < pages.length; i++) {
-        const page   = pages[i];
-        const canvas = await html2canvas(page, {
+        const page      = pages[i];
+        const rawCanvas = await html2canvas(page, {
           scale: 2,
           useCORS: true,
           allowTaint: true,
@@ -378,21 +381,22 @@ const Reports = () => {
           height: page.scrollHeight
         });
 
-        const canvasAspect    = canvas.height / canvas.width;
-        const availableAspect = availableHeight / availableWidth;
-
-        let imgWidth, imgHeight;
-        if (canvasAspect > availableAspect) {
-          imgHeight = availableHeight;
-          imgWidth  = imgHeight / canvasAspect;
-        } else {
-          imgWidth  = availableWidth;
-          imgHeight = imgWidth * canvasAspect;
+        // Pad canvas to A4 aspect ratio so every page is completely filled
+        const targetH = Math.round(rawCanvas.width * availableAspect);
+        let canvas = rawCanvas;
+        if (rawCanvas.height < targetH) {
+          const padded = document.createElement('canvas');
+          padded.width  = rawCanvas.width;
+          padded.height = targetH;
+          const ctx = padded.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, padded.width, padded.height);
+          ctx.drawImage(rawCanvas, 0, 0);
+          canvas = padded;
         }
 
-        const xOffset = margin + (availableWidth - imgWidth) / 2;
         if (i > 0) pdf.addPage();
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', xOffset, margin, imgWidth, imgHeight);
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, availableWidth, availableHeight);
       }
 
       // Open the multi-page PDF and trigger the browser print dialog.
@@ -1167,7 +1171,7 @@ const Reports = () => {
             position: 'fixed',
             left: '-10000px',
             top: 0,
-            width: '1100px',
+            width: '800px',
             background: '#ffffff',
             zIndex: -1,
             pointerEvents: 'none'
@@ -1178,7 +1182,7 @@ const Reports = () => {
             <div
               key={s.studentRecordId || `${s.name}-${i}`}
               className="batch-print-page"
-              style={{ background: '#fff', padding: '1em' }}
+              style={{ background: '#fff', padding: '0' }}
             >
               <IndividualReport student={s} classData={batchStudents} />
             </div>

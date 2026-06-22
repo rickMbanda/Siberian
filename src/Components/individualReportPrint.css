@@ -20,6 +20,10 @@ body.report-print-mode .report-card {
   border-radius: 0 !important;
   page-break-inside: avoid !important;
   break-inside: avoid !important;
+  /* Fill the full A4 page — pushes footer to bottom */
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 290mm !important;
 }
 
 /* ── Letterhead ─────────────────────────────────────────────────────────── */
@@ -144,7 +148,7 @@ body.report-print-mode .report-summary p {
 
 /* ── Class teacher's comments ───────────────────────────────────────────── */
 body.report-print-mode .report-teacher {
-  margin-top: 4px !important;
+  margin-top: auto !important;
   padding: 6px 10px !important;
   min-height: 0 !important;
   border-radius: 6px !important;
