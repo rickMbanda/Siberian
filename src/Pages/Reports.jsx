@@ -258,10 +258,9 @@ const Reports = () => {
     if (!selectedStudent || !individualRef.current) return;
 
     setDownloadingIndividual(true);
-    const style = document.createElement('style');
     try {
-      // Apply compact print CSS and hide UI chrome
-      document.body.classList.add('report-print-mode');
+      // Hide only UI chrome — keep the on-screen report appearance intact
+      const style = document.createElement('style');
       style.innerHTML = `
         .no-print { display: none !important; }
         button { display: none !important; }
@@ -270,11 +269,11 @@ const Reports = () => {
       `;
       document.head.appendChild(style);
 
-      // Let the DOM settle after class/style changes
+      // Let the DOM settle after hiding chrome elements
       await new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(resolve))
       );
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 250));
 
       const rawCanvas = await html2canvas(individualRef.current, {
         scale: 2,
@@ -285,13 +284,15 @@ const Reports = () => {
         height: individualRef.current.scrollHeight
       });
 
+      document.head.removeChild(style);
+
       const pdf = new jsPDF('p', 'mm', 'a4');
       const margin = 8;
       const availableWidth  = 210 - margin * 2;
       const availableHeight = 297 - margin * 2;
       const availableAspect = availableHeight / availableWidth;
 
-      // Pad canvas bottom with white to A4 aspect ratio when content is shorter than A4
+      // Pad canvas to A4 aspect ratio so the PDF page is always completely filled
       const targetH = Math.round(rawCanvas.width * availableAspect);
       let canvas = rawCanvas;
       if (rawCanvas.height < targetH) {
@@ -305,26 +306,12 @@ const Reports = () => {
         canvas = padded;
       }
 
-      // Aspect-preserving placement: padded canvas fills page exactly;
-      // taller-than-A4 canvas fills page height and centers horizontally
-      const canvasAspect = canvas.height / canvas.width;
-      let imgWidth, imgHeight;
-      if (canvasAspect > availableAspect) {
-        imgHeight = availableHeight;
-        imgWidth  = imgHeight / canvasAspect;
-      } else {
-        imgWidth  = availableWidth;
-        imgHeight = imgWidth * canvasAspect;
-      }
-      const xOffset = margin + (availableWidth - imgWidth) / 2;
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', xOffset, margin, imgWidth, imgHeight, '', 'FAST');
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, availableWidth, availableHeight);
       pdf.save(`Individual_Report_${selectedStudent.name}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF. Please try again.');
     } finally {
-      document.body.classList.remove('report-print-mode');
-      if (style.parentNode) document.head.removeChild(style);
       setDownloadingIndividual(false);
     }
   }, [selectedStudent]);
@@ -353,10 +340,6 @@ const Reports = () => {
       return;
     }
 
-    // Apply compact print CSS BEFORE mounting the batch container so every
-    // report renders at the compressed A4 size (not the full desktop layout).
-    document.body.classList.add('report-print-mode');
-
     // Mount the hidden off-screen container so React renders every report
     // and Chart.js draws every chart before we capture them.
     setBatchPreparing(true);
@@ -384,6 +367,7 @@ const Reports = () => {
       const margin         = 8;
       const availableWidth  = 210 - margin * 2;
       const availableHeight = 297 - margin * 2;
+
       const availableAspect = availableHeight / availableWidth;
 
       for (let i = 0; i < pages.length; i++) {
@@ -397,7 +381,7 @@ const Reports = () => {
           height: page.scrollHeight
         });
 
-        // Pad canvas bottom with white to A4 aspect ratio when content is shorter than A4
+        // Pad canvas to A4 aspect ratio so every page is completely filled
         const targetH = Math.round(rawCanvas.width * availableAspect);
         let canvas = rawCanvas;
         if (rawCanvas.height < targetH) {
@@ -411,21 +395,8 @@ const Reports = () => {
           canvas = padded;
         }
 
-        // Aspect-preserving placement: padded canvas fills page exactly;
-        // taller-than-A4 canvas fills page height and centers horizontally
-        const canvasAspect = canvas.height / canvas.width;
-        let imgWidth, imgHeight;
-        if (canvasAspect > availableAspect) {
-          imgHeight = availableHeight;
-          imgWidth  = imgHeight / canvasAspect;
-        } else {
-          imgWidth  = availableWidth;
-          imgHeight = imgWidth * canvasAspect;
-        }
-        const xOffset = margin + (availableWidth - imgWidth) / 2;
-
         if (i > 0) pdf.addPage();
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', xOffset, margin, imgWidth, imgHeight, '', 'FAST');
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, availableWidth, availableHeight);
       }
 
       // Open the multi-page PDF and trigger the browser print dialog.
@@ -446,7 +417,6 @@ const Reports = () => {
       console.error('Error generating batch print:', error);
       alert('Error generating batch print. Please try again.');
     } finally {
-      document.body.classList.remove('report-print-mode');
       setBatchPrinting(false);
     }
   }, [selectedClass, batchStudents]);
