@@ -189,24 +189,45 @@ body.report-print-mode .report-teacher-name {
     size: A4 portrait;
     margin: 0.3in 0.4in;
   }
-  body.report-print-mode .report-card,
-  body.report-print-mode .batch-print-page {
+
+  /* Individual report print */
+  body.report-print-mode .report-card {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
-  /* Each student in a batch print starts on a fresh page */
-  body.report-print-mode .batch-print-page {
-    page-break-after: always !important;
-    break-after: page !important;
-  }
-  body.report-print-mode .batch-print-page:last-child {
-    page-break-after: auto !important;
-    break-after: auto !important;
-  }
+
   /* Preserve colors for inks/laser printers */
-  body.report-print-mode .report-card * {
+  body.report-print-mode .report-card *,
+  body.batch-print-mode .report-card * {
     -webkit-print-color-adjust: exact !important;
     color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* ── Batch print: hide all UI, show only the off-screen report pages ─── */
+  body.batch-print-mode * {
+    visibility: hidden !important;
+  }
+  body.batch-print-mode .batch-print-container,
+  body.batch-print-mode .batch-print-container * {
+    visibility: visible !important;
+  }
+  body.batch-print-mode .batch-print-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    background: white !important;
+    z-index: 99999 !important;
+  }
+  body.batch-print-mode .batch-print-page {
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  body.batch-print-mode .batch-print-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 }

@@ -306,7 +306,7 @@ const Reports = () => {
         canvas = padded;
       }
 
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, availableWidth, availableHeight);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, availableWidth, availableHeight);
       pdf.save(`Individual_Report_${selectedStudent.name}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -340,8 +340,7 @@ const Reports = () => {
       return;
     }
 
-    // Mount the hidden off-screen container so React renders every report
-    // and Chart.js draws every chart before we capture them.
+    // Mount the hidden batch container and wait for React + Chart.js to fully render.
     setBatchPreparing(true);
     setBatchPrinting(true);
 
@@ -355,70 +354,14 @@ const Reports = () => {
 
     setBatchPreparing(false);
 
-    try {
-      const pages = document.querySelectorAll('.batch-print-page');
-      if (pages.length === 0) {
-        alert('Could not find report pages to capture. Please try again.');
-        setBatchPrinting(false);
-        return;
-      }
+    // Use the browser's native print dialog — no canvas/memory limits.
+    // The @media print + body.batch-print-mode CSS hides all UI and reveals
+    // only the off-screen batch container, one student per page.
+    document.body.classList.add('report-print-mode', 'batch-print-mode');
+    window.print();
+    document.body.classList.remove('report-print-mode', 'batch-print-mode');
 
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const margin         = 8;
-      const availableWidth  = 210 - margin * 2;
-      const availableHeight = 297 - margin * 2;
-
-      const availableAspect = availableHeight / availableWidth;
-
-      for (let i = 0; i < pages.length; i++) {
-        const page      = pages[i];
-        const rawCanvas = await html2canvas(page, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#ffffff',
-          width: page.scrollWidth,
-          height: page.scrollHeight
-        });
-
-        // Pad canvas to A4 aspect ratio so every page is completely filled
-        const targetH = Math.round(rawCanvas.width * availableAspect);
-        let canvas = rawCanvas;
-        if (rawCanvas.height < targetH) {
-          const padded = document.createElement('canvas');
-          padded.width  = rawCanvas.width;
-          padded.height = targetH;
-          const ctx = padded.getContext('2d');
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, padded.width, padded.height);
-          ctx.drawImage(rawCanvas, 0, 0);
-          canvas = padded;
-        }
-
-        if (i > 0) pdf.addPage();
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, availableWidth, availableHeight);
-      }
-
-      // Open the multi-page PDF and trigger the browser print dialog.
-      const blob    = pdf.output('blob');
-      const blobUrl = URL.createObjectURL(blob);
-      const win     = window.open(blobUrl);
-      if (win) {
-        win.addEventListener('load', () => {
-          win.focus();
-          win.print();
-          win.addEventListener('afterprint', () => {
-            win.close();
-            URL.revokeObjectURL(blobUrl);
-          });
-        });
-      }
-    } catch (error) {
-      console.error('Error generating batch print:', error);
-      alert('Error generating batch print. Please try again.');
-    } finally {
-      setBatchPrinting(false);
-    }
+    setBatchPrinting(false);
   }, [selectedClass, batchStudents]);
 
   const handleDownloadClass = useCallback(async () => {
