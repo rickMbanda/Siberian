@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API = '';
 
 export default function KillSwitchModal({ onClose }) {
   const [pin, setPin]         = useState('');
