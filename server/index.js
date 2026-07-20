@@ -11,18 +11,64 @@ const activeExamRouter  = require('./routes/activeExam');
 const targetsRouter     = require('./routes/targets');
 const parentPinsRouter  = require('./routes/parentPins');
 const { authenticate } = require('./middleware/auth');
-const User = require('./models/User');
+const User    = require('./models/User');
+const Setting = require('./models/Setting');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const mongoURI = process.env.MONGODB_URI;
+const mongoURI  = process.env.MONGODB_URI;
+const IS_MASTER = process.env.IS_MASTER === 'true';
+const ADMIN_PIN = process.env.ADMIN_PIN || '';
 
 if (!mongoURI) {
   console.error('ERROR: MONGODB_URI environment variable is required');
   process.exit(1);
 }
+
+// ── Kill-switch helpers ───────────────────────────────────────────────────────
+async function ensureKillSwitch() {
+  await Setting.findOneAndUpdate(
+    { key: 'appAccess' },
+    { $setOnInsert: { key: 'appAccess', value: true } },
+    { upsert: true, new: true }
+  );
+}
+
+async function connectDB() {
+  if (mongoose.connection.readyState === 0) {
+    await mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true });
+  }
+}
+
+// Periodic kill-switch enforcement — runs only on non-master installations
+if (!IS_MASTER) {
+  setInterval(async () => {
+    try {
+      const state = mongoose.connection.readyState; // 0=disconnected,1=connected
+      if (state === 1) {
+        const doc = await Setting.findOne({ key: 'appAccess' });
+        if (doc && doc.value === false) {
+          console.log('[system] Access revoked — disconnecting.');
+          await mongoose.disconnect();
+        }
+      } else if (state === 0) {
+        // Try to reconnect; the check above will cut it again if still revoked
+        try {
+          await connectDB();
+          const doc = await Setting.findOne({ key: 'appAccess' });
+          if (doc && doc.value === false) {
+            await mongoose.disconnect();
+          }
+        } catch (_) { /* DB unreachable or still revoked — stay disconnected */ }
+      }
+    } catch (err) {
+      // Connection already gone — nothing to do
+    }
+  }, 60000);
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(async () => {
@@ -39,8 +85,46 @@ mongoose.connect(mongoURI, { useNewUrlParser: true, useUnifiedTopology: true })
       await admin.save();
       console.log('✅ Default admin account created (username: admin)');
     }
+    // Ensure kill-switch document exists (default: access granted)
+    await ensureKillSwitch();
   })
   .catch(err => console.error('MongoDB connection error:', err));
+
+// ── System config routes (hidden admin control) ───────────────────────────────
+// GET  /api/system/config  — read kill-switch state  (requires ADMIN_PIN header)
+// POST /api/system/config  — write kill-switch state (requires ADMIN_PIN header)
+app.get('/api/system/config', async (req, res) => {
+  if (!ADMIN_PIN || req.headers['x-admin-pin'] !== ADMIN_PIN) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const doc = await Setting.findOne({ key: 'appAccess' });
+    res.json({ active: doc ? doc.value : true });
+  } catch (err) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/system/config', async (req, res) => {
+  if (!ADMIN_PIN || req.headers['x-admin-pin'] !== ADMIN_PIN) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const { active } = req.body;
+  if (typeof active !== 'boolean') {
+    return res.status(400).json({ error: 'active must be a boolean' });
+  }
+  try {
+    await Setting.findOneAndUpdate(
+      { key: 'appAccess' },
+      { value: active },
+      { upsert: true }
+    );
+    res.json({ ok: true, active });
+  } catch (err) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Auth routes (public)
 app.use('/api/auth', authRouter);

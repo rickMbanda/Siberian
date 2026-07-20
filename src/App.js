@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './Components/Login';
+import KillSwitchModal from './Components/KillSwitchModal';
 
 import Dashboard from './Pages/Dashboard';
 import OpenerExam from './Pages/OpenerExam';
@@ -84,15 +85,33 @@ const ProtectedRoutes = () => {
   );
 };
 
-const App = () => (
-  <AuthProvider>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/slip/:pin" element={<ParentSlip />} />
-        <Route path="/*" element={<ProtectedRoutes />} />
-      </Routes>
-    </BrowserRouter>
-  </AuthProvider>
-);
+const App = () => {
+  const [showKillSwitch, setShowKillSwitch] = useState(false);
+
+  // Secret shortcut: Ctrl + Shift + K
+  const handleKeyDown = useCallback((e) => {
+    if (e.ctrlKey && e.shiftKey && e.key === 'K') {
+      e.preventDefault();
+      setShowKillSwitch((v) => !v);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/slip/:pin" element={<ParentSlip />} />
+          <Route path="/*" element={<ProtectedRoutes />} />
+        </Routes>
+      </BrowserRouter>
+      {showKillSwitch && <KillSwitchModal onClose={() => setShowKillSwitch(false)} />}
+    </AuthProvider>
+  );
+};
 
 export default App;
