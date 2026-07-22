@@ -78,6 +78,18 @@ export const fetchAllStudents = async (academicYear = null) => {
 };
 
 /**
+ * Rename a roster student without affecting any of their marks.
+ */
+export const renameRosterStudent = async (id, newName) =>
+  handleResponse(
+    await fetch(`${getBaseUrl()}/roster/${id}/rename`, {
+      method:  'PATCH',
+      headers: authHeaders(),
+      body:    JSON.stringify({ name: newName })
+    })
+  );
+
+/**
  * Delete a student record by its MongoDB _id.
  */
 export const deleteStudentRecord = async (id) =>

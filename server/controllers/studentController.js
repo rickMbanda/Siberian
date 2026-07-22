@@ -391,6 +391,44 @@ exports.createRosterStudent = async (req, res) => {
   }
 };
 
+// ── Controller: Rename a roster student (preserves all marks) ────────────────
+exports.renameRosterStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'New name is required.' });
+    }
+    const trimmedName = name.trim();
+    const record = await StudentRecord.findById(id);
+    if (!record) {
+      return res.status(404).json({ error: 'Student not found.' });
+    }
+    // Check for duplicate name in same class + year
+    const nameKey  = normalizeStudentName(trimmedName);
+    const duplicate = await StudentRecord.findOne({
+      nameKey,
+      classKey:       record.classKey,
+      academicYearKey: record.academicYearKey,
+      _id:            { $ne: record._id }
+    });
+    if (duplicate) {
+      return res.status(409).json({
+        error: `"${trimmedName}" already exists in ${record.class} (${record.academicYear}).`
+      });
+    }
+    record.name = trimmedName;
+    // nameKey is updated automatically by the pre-save hook
+    await record.save();
+    res.json({ _id: record._id, name: record.name, class: record.class, academicYear: record.academicYear });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'A student with that name already exists for this class and year.' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // ── Controller: Bulk-create roster students from a list of names ──────────────
 exports.bulkCreateRosterStudents = async (req, res) => {
   try {

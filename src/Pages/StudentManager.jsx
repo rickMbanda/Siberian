@@ -5,7 +5,8 @@ import {
   fetchRosterByClass,
   deleteStudentRecord,
   bulkCreateRosterStudents,
-  promoteRoster
+  promoteRoster,
+  renameRosterStudent
 } from '../api/students';
 
 const classes = [
@@ -30,6 +31,11 @@ const StudentManager = () => {
   const [bulkText, setBulkText]           = useState('');
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkResult, setBulkResult]       = useState(null);
+
+  // Inline rename state
+  const [editingId, setEditingId]     = useState(null);
+  const [editingName, setEditingName] = useState('');
+  const [renaming, setRenaming]       = useState(false);
 
   // Promotion modal state
   const [promoteOpen, setPromoteOpen]               = useState(false);
@@ -88,6 +94,34 @@ const StudentManager = () => {
       showFeedback('error', err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRenameStart = (student) => {
+    setEditingId(student._id);
+    setEditingName(student.name);
+  };
+
+  const handleRenameCancel = () => {
+    setEditingId(null);
+    setEditingName('');
+  };
+
+  const handleRenameSave = async (student) => {
+    const trimmed = editingName.trim();
+    if (!trimmed) { showFeedback('error', 'Name cannot be empty.'); return; }
+    if (trimmed === student.name) { handleRenameCancel(); return; }
+    setRenaming(true);
+    try {
+      await renameRosterStudent(student._id, trimmed);
+      showFeedback('success', `Renamed "${student.name}" to "${trimmed}".`);
+      setEditingId(null);
+      setEditingName('');
+      await loadRoster();
+    } catch (err) {
+      showFeedback('error', err.message);
+    } finally {
+      setRenaming(false);
     }
   };
 
@@ -576,22 +610,115 @@ const StudentManager = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredRoster.map((s, i) => (
-                <tr key={s._id}>
-                  <td style={styles.td}>{i + 1}</td>
-                  <td style={{ ...styles.td, fontWeight: 600, color: '#1f2937' }}>{s.name}</td>
-                  <td style={styles.td}>{s.class}</td>
-                  <td style={{ ...styles.td, textAlign: 'right' }}>
-                    <button
-                      onClick={() => handleDelete(s)}
-                      style={styles.deleteBtn}
-                      title="Remove student and delete all their marks"
-                    >
-                      🗑️ Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredRoster.map((s, i) => {
+                const isEditing = editingId === s._id;
+                return (
+                  <tr key={s._id} style={{ background: isEditing ? '#f0f9ff' : undefined }}>
+                    <td style={styles.td}>{i + 1}</td>
+                    <td style={{ ...styles.td, fontWeight: 600, color: '#1f2937' }}>
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRenameSave(s);
+                            if (e.key === 'Escape') handleRenameCancel();
+                          }}
+                          disabled={renaming}
+                          style={{
+                            ...styles.input,
+                            padding: '7px 10px',
+                            fontSize: '0.95rem',
+                            width: '100%',
+                            maxWidth: '320px',
+                            border: '2px solid #3b82f6'
+                          }}
+                        />
+                      ) : (
+                        s.name
+                      )}
+                    </td>
+                    <td style={styles.td}>{s.class}</td>
+                    <td style={{ ...styles.td, textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={() => handleRenameSave(s)}
+                              disabled={renaming}
+                              style={{
+                                padding: '7px 14px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                color: '#fff',
+                                cursor: renaming ? 'not-allowed' : 'pointer',
+                                fontWeight: 700,
+                                fontSize: '0.85rem'
+                              }}
+                              title="Save new name"
+                            >
+                              {renaming ? '…' : '✓ Save'}
+                            </button>
+                            <button
+                              onClick={handleRenameCancel}
+                              disabled={renaming}
+                              style={{
+                                padding: '7px 14px',
+                                borderRadius: '8px',
+                                border: '1px solid #d1d5db',
+                                background: '#fff',
+                                color: '#374151',
+                                cursor: renaming ? 'not-allowed' : 'pointer',
+                                fontWeight: 600,
+                                fontSize: '0.85rem'
+                              }}
+                              title="Cancel"
+                            >
+                              ✕
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => handleRenameStart(s)}
+                              disabled={!!editingId}
+                              style={{
+                                padding: '8px 14px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: editingId
+                                  ? '#e5e7eb'
+                                  : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                color: editingId ? '#9ca3af' : '#fff',
+                                cursor: editingId ? 'not-allowed' : 'pointer',
+                                fontWeight: 600,
+                                fontSize: '0.85rem'
+                              }}
+                              title="Rename this student"
+                            >
+                              ✏️ Rename
+                            </button>
+                            <button
+                              onClick={() => handleDelete(s)}
+                              disabled={!!editingId}
+                              style={{
+                                ...styles.deleteBtn,
+                                opacity: editingId ? 0.5 : 1,
+                                cursor: editingId ? 'not-allowed' : 'pointer'
+                              }}
+                              title="Remove student and delete all their marks"
+                            >
+                              🗑️ Remove
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

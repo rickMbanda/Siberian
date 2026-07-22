@@ -10,6 +10,7 @@ router.post('/roster',                          ctrl.createRosterStudent);
 router.post('/roster/bulk',                     ctrl.bulkCreateRosterStudents);
 router.post('/roster/promote',                  ctrl.promoteRoster);
 router.get('/roster/class/:className',          ctrl.getRosterByClass);
+router.patch('/roster/:id/rename',              ctrl.renameRosterStudent);
 
 // Flat-format reads (compatible with existing reports / frontend)
 router.get('/',                                   ctrl.getAll);
