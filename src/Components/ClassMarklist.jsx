@@ -183,7 +183,7 @@ const ClassMarklist = ({ students, selectedClass, selectedTerm, selectedExamType
       borderRadius: '16px',
       overflow: 'visible', // Ensure table content is fully visible
       boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-      fontSize: '12px', // Slightly smaller for Excel-like appearance
+      fontSize: '13px', // Slightly smaller for Excel-like appearance
       position: 'relative',
       zIndex: 1,
       border: '2px solid #1e40af', // Excel-like border
@@ -195,7 +195,7 @@ const ClassMarklist = ({ students, selectedClass, selectedTerm, selectedExamType
       fontWeight: '800',
       padding: '12px 8px', // More compact
       textAlign: 'center',
-      fontSize: '11px', // Smaller font
+      fontSize: '12px', // Smaller font
       border: '1px solid #1e3a8a',
       position: 'sticky',
       top: '0',
@@ -213,7 +213,7 @@ const ClassMarklist = ({ students, selectedClass, selectedTerm, selectedExamType
       padding: '8px 6px', // More compact like Excel
       border: '1px solid #d1d5db', // Excel-like grid borders
       textAlign: 'center',
-      fontSize: '11px', // Smaller font for more data
+      fontSize: '12px', // Smaller font for more data
       color: '#334155',
       minWidth: '50px',
       maxWidth: '80px',
@@ -234,7 +234,7 @@ const ClassMarklist = ({ students, selectedClass, selectedTerm, selectedExamType
       padding: '8px 6px', // Compact like Excel
       color: '#1e293b',
       border: '1px solid #d1d5db',
-      fontSize: '11px'
+      fontSize: '12px'
     },
     tableRowEven: {
       backgroundColor: '#f8fafc',
@@ -380,7 +380,7 @@ const ClassMarklist = ({ students, selectedClass, selectedTerm, selectedExamType
               }}
             >
               <td style={{...styles.tableCell, textAlign: 'center', fontWeight: 'bold'}}>{student.position}</td>
-              <td style={{...styles.nameCell, fontSize: '12px', fontWeight: '600'}}>{student.name || '-'}</td>
+              <td style={{...styles.nameCell, fontSize: '13px', fontWeight: '600'}}>{student.name || '-'}</td>
               {subjects.map(subject => (
                 <td key={subject} style={{...styles.tableCell, textAlign: 'center', fontWeight: '500'}}>
                   {student[subject] || '-'}
@@ -611,10 +611,10 @@ const ClassMarklist = ({ students, selectedClass, selectedTerm, selectedExamType
           textShadow: 'none'
         }}>Subject Rankings by Class Average</h3>
         <div style={styles.tableWrapper}>
-          <table style={{...styles.table, fontSize: '10px'}}>
+          <table style={{...styles.table, fontSize: '11px'}}>
             <thead>
               <tr>
-                <th style={{...styles.tableHeader, fontSize: '9px', padding: '6px 4px'}}>Subject Ranking</th>
+                <th style={{...styles.tableHeader, fontSize: '10px', padding: '6px 4px'}}>Subject Ranking</th>
                 {(() => {
                   // Calculate averages and sort subjects by performance
                   const subjectAverages = subjects.map(subject => {
@@ -630,7 +630,7 @@ const ClassMarklist = ({ students, selectedClass, selectedTerm, selectedExamType
                   }).sort((a, b) => b.average - a.average);
 
                   return subjectAverages.map((item, index) => (
-                    <th key={item.subject} style={{...styles.tableHeader, fontSize: '8px', padding: '6px 4px'}}>
+                    <th key={item.subject} style={{...styles.tableHeader, fontSize: '9px', padding: '6px 4px'}}>
                       {index + 1}. {getSubjectDisplayName(item.subject)}
                     </th>
                   ));
