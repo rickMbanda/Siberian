@@ -237,7 +237,7 @@ const IndividualReport = ({ student, classData, historicalData = [] }) => {
     "Grade 1": "Tr Margaret",
     "Grade 2": "Tr Emily",
     "Grade 3": "Tr Angel",
-    "Grade 4": "Tr Safari",
+    "Grade 4": "Tr Monica",
     "Grade 5": "Tr Erick",
     "Grade 6": "Tr Njeri",
     "Grade 7": "Tr David",

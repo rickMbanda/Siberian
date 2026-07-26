@@ -3,12 +3,7 @@ const router        = express.Router();
 const ParentPin     = require('../models/ParentPin');
 const StudentRecord = require('../models/StudentRecord');
 const { adminOnly } = require('../middleware/auth');
-
-const ALL_SUBJECTS = [
-  'maths', 'english', 'kiswahili', 'language', 'reading',
-  'environmental', 'integrated', 'creative', 'cre',
-  'kusoma', 'social', 'pretech', 'agriculture'
-];
+const { ALL_SUBJECTS } = require('../utils/subjectConfig');
 
 const TERM_KEY_MAP = {
   'term 1': 'term1', 'term1': 'term1',

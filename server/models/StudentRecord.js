@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const ALL_SUBJECTS = [
   'maths', 'english', 'kiswahili', 'language', 'reading',
   'environmental', 'integrated', 'creative', 'cre',
-  'kusoma', 'social', 'pretech', 'agriculture'
+  'kusoma', 'social', 'pretech', 'agriculture', 'Psychomotor'
 ];
 
 const subjectFields = {};

@@ -1,15 +1,15 @@
 
 // Define subjects for each class
 const subjectsByClass = {
-  'Playgroup': ['maths', 'language', 'reading', 'environmental','creative','cre'],
-  'PP1': ['maths', 'language', 'reading', 'environmental','creative','cre'],
-  'PP2': ['maths', 'language', 'reading', 'kiswahili','environmental', 'cre', 'creative', 'kusoma'],
+  'Playgroup': ['maths', 'language', 'reading', 'environmental','creative','Psychomotor'],
+  'PP1': ['maths', 'language', 'reading', 'creative','environmental','cre'],
+  'PP2': ['maths', 'language', 'reading', 'kiswahili','kusoma', 'environmental', 'creative', 'cre'],
   'Grade 1': ['maths', 'english', 'kiswahili', 'integrated'],
   'Grade 2': ['maths', 'english', 'kiswahili', 'integrated'],
   'Grade 3': ['maths', 'english', 'kiswahili', 'integrated'],
-  'Grade 4': ['maths', 'english', 'kiswahili', 'integrated', 'social'],
-  'Grade 5': ['maths', 'english', 'kiswahili', 'integrated', 'social'],
-  'Grade 6': ['maths', 'english', 'kiswahili', 'integrated', 'social'],
+  'Grade 4': ['maths', 'english', 'kiswahili', 'integrated', 'social', 'creative'],
+  'Grade 5': ['maths', 'english', 'kiswahili', 'integrated', 'social', 'creative'],
+  'Grade 6': ['maths', 'english', 'kiswahili', 'integrated', 'social', 'creative'],
   'Grade 7': ['maths', 'english', 'kiswahili', 'social', 'integrated', 'creative', 'cre', 'agriculture', 'pretech'],
   'Grade 8': ['maths', 'english', 'kiswahili', 'integrated', 'agriculture', 'pretech', 'creative', 'social', 'cre'],
   'Grade 9': ['maths', 'english', 'kiswahili', 'integrated', 'social', 'pretech', 'creative', 'agriculture', 'cre']

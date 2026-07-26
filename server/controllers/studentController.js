@@ -1,11 +1,6 @@
 const StudentRecord = require('../models/StudentRecord');
 const LockConfig = require('../models/LockConfig');
-
-const ALL_SUBJECTS = [
-  'maths', 'english', 'kiswahili', 'language', 'reading',
-  'environmental', 'integrated', 'creative', 'cre',
-  'kusoma', 'social', 'pretech', 'agriculture'
-];
+const { ALL_SUBJECTS } = require('../utils/subjectConfig');
 
 // ── Rubric thresholds (matches frontend) ──────────────────────────────────────
 const getRubric = (mean) => {
