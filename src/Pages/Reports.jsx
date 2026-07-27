@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import JSZip from 'jszip';
 import IndividualReport from '../Components/IndividualReport';
 import ClassMarklist from '../Components/ClassMarklist';
 import ExamNavigation from '../Components/ExamNavigation';
@@ -41,10 +42,23 @@ const Reports = () => {
   const [downloadingClass, setDownloadingClass] = useState(false);
   const [downloadingIndividual, setDownloadingIndividual] = useState(false);
   const [batchPrinting, setBatchPrinting] = useState(false);
+  const [batchDownloading, setBatchDownloading] = useState(false);
   const [batchPreparing, setBatchPreparing] = useState(false);
+  const [batchDownloadPreparing, setBatchDownloadPreparing] = useState(false);
+  const [batchDownloadProgress, setBatchDownloadProgress] = useState(0);
 
   const individualRef = useRef();
   const classRef = useRef();
+
+  const addReportPrintMode = () => document.body.classList.add('report-print-mode');
+  const removeReportPrintMode = () => document.body.classList.remove('report-print-mode');
+  const getReportCaptureTarget = (container) => container?.querySelector('.report-card') || container;
+  const safeFileName = (name) =>
+    (name || 'student')
+      .replace(/[\\/:*?"<>|]+/g, '')
+      .trim()
+      .replace(/\s+/g, '_')
+      .slice(0, 80);
 
   const [parentPin, setParentPin] = useState(null);
   const [pinLoading, setPinLoading] = useState(false);
@@ -269,22 +283,25 @@ const Reports = () => {
       `;
       document.head.appendChild(style);
 
-      // Let the DOM settle after hiding chrome elements
+      // Apply compact report print styling and let the DOM settle
+      addReportPrintMode();
       await new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(resolve))
       );
       await new Promise((resolve) => setTimeout(resolve, 250));
 
-      const rawCanvas = await html2canvas(individualRef.current, {
+      const captureElement = getReportCaptureTarget(individualRef.current);
+      const rawCanvas = await html2canvas(captureElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-        width: individualRef.current.scrollWidth,
-        height: individualRef.current.scrollHeight
+        width: captureElement.scrollWidth,
+        height: captureElement.scrollHeight
       });
 
       document.head.removeChild(style);
+      removeReportPrintMode();
 
       const pdf = new jsPDF('p', 'mm', 'a4');
       const margin = 8;
@@ -312,6 +329,7 @@ const Reports = () => {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF. Please try again.');
     } finally {
+      removeReportPrintMode();
       setDownloadingIndividual(false);
     }
   }, [selectedStudent]);
@@ -356,8 +374,10 @@ const Reports = () => {
     setBatchPreparing(false);
 
     try {
+      addReportPrintMode();
       const pages = document.querySelectorAll('.batch-print-page');
       if (pages.length === 0) {
+        removeReportPrintMode();
         alert('Could not find report pages to capture. Please try again.');
         setBatchPrinting(false);
         return;
@@ -371,14 +391,15 @@ const Reports = () => {
       const availableAspect = availableHeight / availableWidth;
 
       for (let i = 0; i < pages.length; i++) {
-        const page      = pages[i];
-        const rawCanvas = await html2canvas(page, {
+        const page = pages[i];
+        const captureElement = getReportCaptureTarget(page);
+        const rawCanvas = await html2canvas(captureElement, {
           scale: 2,
           useCORS: true,
           allowTaint: true,
           backgroundColor: '#ffffff',
-          width: page.scrollWidth,
-          height: page.scrollHeight
+          width: captureElement.scrollWidth,
+          height: captureElement.scrollHeight
         });
 
         // Pad canvas to A4 aspect ratio so every page is completely filled
@@ -417,7 +438,106 @@ const Reports = () => {
       console.error('Error generating batch print:', error);
       alert('Error generating batch print. Please try again.');
     } finally {
+      removeReportPrintMode();
       setBatchPrinting(false);
+    }
+  }, [selectedClass, batchStudents]);
+
+  const handleBatchDownload = useCallback(async () => {
+    if (selectedClass === 'All Classes') {
+      alert('Please pick a specific class (not "All Classes") before batch downloading.');
+      return;
+    }
+    if (!batchStudents || batchStudents.length === 0) {
+      alert('No students with marks were found for this class / term / exam combination.');
+      return;
+    }
+
+    setBatchDownloadPreparing(true);
+    setBatchDownloading(true);
+    setBatchDownloadProgress(0);
+
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))
+    );
+    await new Promise((resolve) =>
+      setTimeout(resolve, 600 + batchStudents.length * 60)
+    );
+
+    setBatchDownloadPreparing(false);
+
+    try {
+      addReportPrintMode();
+      const pages = document.querySelectorAll('.batch-download-page');
+      if (pages.length === 0) {
+        removeReportPrintMode();
+        alert('Could not find report pages to capture. Please try again.');
+        setBatchDownloading(false);
+        return;
+      }
+
+      const zip = new JSZip();
+      const margin = 8;
+      const availableWidth = 210 - margin * 2;
+      const availableHeight = 297 - margin * 2;
+      const availableAspect = availableHeight / availableWidth;
+
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const student = batchStudents[i];
+        const captureElement = getReportCaptureTarget(page);
+        const rawCanvas = await html2canvas(captureElement, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          width: captureElement.scrollWidth,
+          height: captureElement.scrollHeight,
+        });
+
+        const targetH = Math.round(rawCanvas.width * availableAspect);
+        let canvas = rawCanvas;
+        if (rawCanvas.height < targetH) {
+          const padded = document.createElement('canvas');
+          padded.width = rawCanvas.width;
+          padded.height = targetH;
+          const ctx = padded.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, padded.width, padded.height);
+          ctx.drawImage(rawCanvas, 0, 0);
+          canvas = padded;
+        }
+
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, availableWidth, availableHeight);
+        const pdfBlob = pdf.output('blob');
+
+        const studentName = safeFileName(student?.name || `student-${i + 1}`);
+        const className = selectedClass !== 'All Classes' ? selectedClass : 'Class';
+        zip.file(`${className}/${studentName}.pdf`, pdfBlob);
+
+        setBatchDownloadProgress(Math.round(((i + 1) / pages.length) * 100));
+      }
+
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipName = `${selectedClass !== 'All Classes' ? selectedClass : 'Class'}_Reports_${timestamp}.zip`;
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = zipName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating batch download:', error);
+      alert('Error generating batch download. Please try again.');
+    } finally {
+      removeReportPrintMode();
+      setBatchDownloading(false);
+      setBatchDownloadPreparing(false);
+      setBatchDownloadProgress(0);
     }
   }, [selectedClass, batchStudents]);
 
@@ -508,22 +628,25 @@ const Reports = () => {
         .exam-nav { display: none !important; }
       `;
       document.head.appendChild(style);
+      addReportPrintMode();
 
       await new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(resolve))
       );
       await new Promise((resolve) => setTimeout(resolve, 250));
 
-      const canvas = await html2canvas(individualRef.current, {
+      const captureElement = getReportCaptureTarget(individualRef.current);
+      const canvas = await html2canvas(captureElement, {
         scale: 2,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-        width: individualRef.current.scrollWidth,
-        height: individualRef.current.scrollHeight
+        width: captureElement.scrollWidth,
+        height: captureElement.scrollHeight
       });
 
       document.head.removeChild(style);
+      removeReportPrintMode();
 
       // Build the same single-page A4 PDF used for download
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -564,6 +687,7 @@ const Reports = () => {
       console.error('Error generating print preview:', error);
       alert('Error generating print preview. Please try again.');
     } finally {
+      removeReportPrintMode();
       setPrintingIndividual(false);
     }
   }, [selectedStudent]);
@@ -1048,6 +1172,29 @@ const Reports = () => {
               ? `Capturing ${batchStudents.length} reports…`
               : `🖨️ Batch Print All Reports${selectedClass !== 'All Classes' ? ` — ${selectedClass} (${batchStudents.length})` : ''}`}
         </button>
+        <button
+          onClick={handleBatchDownload}
+          title={
+            selectedClass === 'All Classes'
+              ? 'Pick a specific class above to enable batch download'
+              : `Download every student's report in ${selectedClass} as a single PDF`
+          }
+          style={{
+            ...styles.button,
+            backgroundColor: '#1d7aee',
+            opacity: (batchDownloading || selectedClass === 'All Classes' || batchStudents.length === 0) ? 0.6 : 1,
+            cursor: batchDownloading
+              ? 'wait'
+              : (selectedClass === 'All Classes' || batchStudents.length === 0 ? 'not-allowed' : 'pointer')
+          }}
+          disabled={batchDownloading || selectedClass === 'All Classes' || batchStudents.length === 0}
+        >
+          {batchDownloadPreparing
+            ? `Preparing ${batchStudents.length} reports…`
+            : batchDownloading
+              ? `Downloading ${batchStudents.length} reports…`
+              : `📥 Batch Download All Reports${selectedClass !== 'All Classes' ? ` — ${selectedClass} (${batchStudents.length})` : ''}`}
+        </button>
       </div>
       {batchPrinting && (
         <div className="no-print" style={{
@@ -1062,6 +1209,24 @@ const Reports = () => {
           {batchPreparing
             ? <>Rendering <strong>{batchStudents.length}</strong> student reports — this can take a few seconds for big classes…</>
             : <>Capturing reports — a print window will open automatically when ready.</>}
+        </div>
+      )}
+      {batchDownloading && (
+        <div className="no-print" style={{
+          marginTop: '0.8em',
+          padding: '0.8em 1em',
+          background: '#eef6ff',
+          border: '1px solid #bfdbfe',
+          borderRadius: '8px',
+          color: '#1e40af',
+          fontSize: '0.95em'
+        }}>
+          <div style={{ marginBottom: '0.5em', fontWeight: 600 }}>
+            Downloading batch report — {batchDownloadProgress}% complete
+          </div>
+          <div style={{ width: '100%', height: '10px', background: '#dbeafe', borderRadius: '999px' }}>
+            <div style={{ width: `${batchDownloadProgress}%`, height: '100%', background: '#2563eb', borderRadius: '999px', transition: 'width 0.2s ease' }} />
+          </div>
         </div>
       )}
 
@@ -1182,6 +1347,31 @@ const Reports = () => {
             <div
               key={s.studentRecordId || `${s.name}-${i}`}
               className="batch-print-page"
+              style={{ background: '#fff', padding: '0' }}
+            >
+              <IndividualReport student={s} classData={batchStudents} />
+            </div>
+          ))}
+        </div>
+      )}
+      {batchDownloading && (
+        <div
+          className="batch-download-container"
+          style={{
+            position: 'fixed',
+            left: '-10000px',
+            top: 0,
+            width: '800px',
+            background: '#ffffff',
+            zIndex: -1,
+            pointerEvents: 'none'
+          }}
+          aria-hidden="true"
+        >
+          {batchStudents.map((s, i) => (
+            <div
+              key={s.studentRecordId || `${s.name}-${i}`}
+              className="batch-download-page"
               style={{ background: '#fff', padding: '0' }}
             >
               <IndividualReport student={s} classData={batchStudents} />
